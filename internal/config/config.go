@@ -8,6 +8,7 @@ import (
 )
 
 type IPTVConfig struct {
+	Provider   string `json:"provider"`
 	APIAddress string `json:"apiAddress"`
 	UID        string `json:"uid"`
 	Pass       string `json:"pass"`

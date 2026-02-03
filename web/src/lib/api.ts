@@ -45,8 +45,15 @@ export interface PlaylistChannel {
   hasCustom: boolean;
 }
 
+export interface ProviderInfo {
+  type: string;
+  name: string;
+  description: string;
+}
+
 export interface Settings {
   iptv: {
+    provider: string;
     apiAddress: string;
     uid: string;
     pass: string;
@@ -62,6 +69,7 @@ export interface Settings {
   playlistUpdateTime: string;
   discordWebhook?: string;
   hasDiscordWebhook?: boolean;
+  availableProviders?: ProviderInfo[];
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

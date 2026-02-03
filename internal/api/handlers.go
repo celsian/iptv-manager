@@ -7,6 +7,7 @@ import (
 
 	"github.com/celsian/iptv-manager/internal/config"
 	"github.com/celsian/iptv-manager/internal/discord"
+	"github.com/celsian/iptv-manager/internal/iptv"
 )
 
 // IPTV Provider handlers (for searching/toggling on remote IPTV service)
@@ -20,7 +21,7 @@ func (s *Server) handleChannelSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iptvChannels, err := s.iptvClient.Search(playlist, query)
+	iptvChannels, err := s.iptvProvider.Search(playlist, query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -41,7 +42,7 @@ func (s *Server) handleChannelToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.iptvClient.Toggle(req.Playlist, req.ChannelID, req.Enable); err != nil {
+	if err := s.iptvProvider.Toggle(req.Playlist, req.ChannelID, req.Enable); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -145,8 +146,15 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	cfg := s.cfg.Get()
 
+	// Default to iptorrents for backwards compatibility
+	provider := cfg.IPTV.Provider
+	if provider == "" {
+		provider = "iptorrents"
+	}
+
 	response := map[string]interface{}{
 		"iptv": map[string]interface{}{
+			"provider":   provider,
 			"apiAddress": cfg.IPTV.APIAddress,
 			"uid":        maskString(cfg.IPTV.UID),
 			"pass":       maskString(cfg.IPTV.Pass),
@@ -158,10 +166,11 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 			"apiKey":     maskString(cfg.Emby.APIKey),
 			"hasApiKey":  cfg.Emby.APIKey != "",
 		},
-		"playlistSources":    cfg.PlaylistSources,
-		"playlistUpdateTime": cfg.PlaylistUpdateTime,
-		"discordWebhook":     cfg.DiscordWebhook,
-		"hasDiscordWebhook":  cfg.DiscordWebhook != "",
+		"playlistSources":      cfg.PlaylistSources,
+		"playlistUpdateTime":   cfg.PlaylistUpdateTime,
+		"discordWebhook":       cfg.DiscordWebhook,
+		"hasDiscordWebhook":    cfg.DiscordWebhook != "",
+		"availableProviders":   iptv.GetProviderInfo(),
 	}
 
 	respondJSON(w, response)
@@ -170,6 +179,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IPTV struct {
+			Provider   string `json:"provider"`
 			APIAddress string `json:"apiAddress"`
 			UID        string `json:"uid"`
 			Pass       string `json:"pass"`
@@ -192,6 +202,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	newCfg := config.Config{
 		IPTV: config.IPTVConfig{
+			Provider:   req.IPTV.Provider,
 			APIAddress: req.IPTV.APIAddress,
 			UID:        req.IPTV.UID,
 			Pass:       req.IPTV.Pass,

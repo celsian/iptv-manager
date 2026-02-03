@@ -163,7 +163,7 @@ func (s *Server) handleLocalChannelDisable(w http.ResponseWriter, r *http.Reques
 
 	// Also disable in IPTV provider
 	if req.Playlist != "" {
-		_ = s.iptvClient.Toggle(req.Playlist, req.IPTVId, false)
+		_ = s.iptvProvider.Toggle(req.Playlist, req.IPTVId, false)
 	}
 
 	respondJSON(w, map[string]bool{"success": true})

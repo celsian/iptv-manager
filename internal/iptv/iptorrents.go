@@ -12,27 +12,26 @@ import (
 	"github.com/celsian/iptv-manager/internal/config"
 )
 
-type Channel struct {
-	Title   string `json:"title"`
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
-	URL     string `json:"url,omitempty"`
-	Group   string `json:"group,omitempty"`
-}
-
-type Client struct {
+// IPTorrentsProvider implements the Provider interface for IPTorrents IPTV service
+type IPTorrentsProvider struct {
 	cfg        *config.Manager
 	httpClient *http.Client
 }
 
-func NewClient(cfg *config.Manager) *Client {
-	return &Client{
+// NewIPTorrentsProvider creates a new IPTorrents provider instance
+func NewIPTorrentsProvider(cfg *config.Manager) *IPTorrentsProvider {
+	return &IPTorrentsProvider{
 		cfg:        cfg,
 		httpClient: &http.Client{},
 	}
 }
 
-func (c *Client) Search(playlist, searchTerm string) ([]Channel, error) {
+// Name returns the provider's display name
+func (p *IPTorrentsProvider) Name() string {
+	return "IPTorrents"
+}
+
+func (p *IPTorrentsProvider) Search(playlist, searchTerm string) ([]Channel, error) {
 	data := url.Values{
 		"jxt": {"4"},
 		"jxw": {"sch"},
@@ -40,16 +39,16 @@ func (c *Client) Search(playlist, searchTerm string) ([]Channel, error) {
 		"c":   {searchTerm},
 	}
 
-	jsonBody, err := c.requestJSON(data)
+	jsonBody, err := p.requestJSON(data)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.parseChannels(jsonBody)
+	return p.parseChannels(jsonBody)
 }
 
-func (c *Client) GetPlaylists() ([]string, error) {
-	cfg := c.cfg.Get()
+func (p *IPTorrentsProvider) GetPlaylists() ([]string, error) {
+	cfg := p.cfg.Get()
 
 	data := url.Values{
 		"jxt": {"4"},
@@ -63,7 +62,7 @@ func (c *Client) GetPlaylists() ([]string, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Cookie", fmt.Sprintf("uid=%s; pass=%s", cfg.IPTV.UID, cfg.IPTV.Pass))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -74,10 +73,10 @@ func (c *Client) GetPlaylists() ([]string, error) {
 		return nil, err
 	}
 
-	return c.parsePlaylists(jsonBody)
+	return p.parsePlaylists(jsonBody)
 }
 
-func (c *Client) parsePlaylists(jsonBody map[string]interface{}) ([]string, error) {
+func (p *IPTorrentsProvider) parsePlaylists(jsonBody map[string]interface{}) ([]string, error) {
 	var playlists []string
 
 	fs, ok := jsonBody["Fs"].([]interface{})
@@ -120,7 +119,7 @@ func (c *Client) parsePlaylists(jsonBody map[string]interface{}) ([]string, erro
 	return playlists, nil
 }
 
-func (c *Client) Toggle(playlist, channelID string, enable bool) error {
+func (p *IPTorrentsProvider) Toggle(playlist, channelID string, enable bool) error {
 	data := url.Values{
 		"jxt": {"4"},
 		"jxw": {"s"},
@@ -134,12 +133,12 @@ func (c *Client) Toggle(playlist, channelID string, enable bool) error {
 		data.Set("a", "0")
 	}
 
-	_, err := c.requestJSON(data)
+	_, err := p.requestJSON(data)
 	return err
 }
 
-func (c *Client) GetChannelURL(channelID string) (string, error) {
-	cfg := c.cfg.Get()
+func (p *IPTorrentsProvider) GetChannelURL(channelID string) (string, error) {
+	cfg := p.cfg.Get()
 	baseURL := strings.TrimSuffix(cfg.IPTV.APIAddress, "/stalker_portal/server/load.php")
 	streamURL := fmt.Sprintf("%s/stalker_portal/streaming/", baseURL)
 
@@ -156,7 +155,7 @@ func (c *Client) GetChannelURL(channelID string) (string, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Cookie", fmt.Sprintf("uid=%s; pass=%s", cfg.IPTV.UID, cfg.IPTV.Pass))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -177,8 +176,8 @@ func (c *Client) GetChannelURL(channelID string) (string, error) {
 	return "", fmt.Errorf("unable to get stream URL")
 }
 
-func (c *Client) requestJSON(data url.Values) (map[string]interface{}, error) {
-	cfg := c.cfg.Get()
+func (p *IPTorrentsProvider) requestJSON(data url.Values) (map[string]interface{}, error) {
+	cfg := p.cfg.Get()
 
 	req, err := http.NewRequest("POST", cfg.IPTV.APIAddress, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -187,7 +186,7 @@ func (c *Client) requestJSON(data url.Values) (map[string]interface{}, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Cookie", fmt.Sprintf("uid=%s; pass=%s", cfg.IPTV.UID, cfg.IPTV.Pass))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +200,7 @@ func (c *Client) requestJSON(data url.Values) (map[string]interface{}, error) {
 	return jsonBody, nil
 }
 
-func (c *Client) parseChannels(jsonBody map[string]interface{}) ([]Channel, error) {
+func (p *IPTorrentsProvider) parseChannels(jsonBody map[string]interface{}) ([]Channel, error) {
 	var channels []Channel
 
 	fs, ok := jsonBody["Fs"].([]interface{})
@@ -263,8 +262,8 @@ func (c *Client) parseChannels(jsonBody map[string]interface{}) ([]Channel, erro
 	return channels, nil
 }
 
-func (c *Client) GetEnabledChannels(playlist string) ([]Channel, error) {
-	cfg := c.cfg.Get()
+func (p *IPTorrentsProvider) GetEnabledChannels(playlist string) ([]Channel, error) {
+	cfg := p.cfg.Get()
 
 	data := url.Values{
 		"jxt": {"4"},
@@ -280,7 +279,7 @@ func (c *Client) GetEnabledChannels(playlist string) ([]Channel, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Cookie", fmt.Sprintf("uid=%s; pass=%s", cfg.IPTV.UID, cfg.IPTV.Pass))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +290,7 @@ func (c *Client) GetEnabledChannels(playlist string) ([]Channel, error) {
 		return nil, err
 	}
 
-	allChannels, err := c.parseChannels(jsonBody)
+	allChannels, err := p.parseChannels(jsonBody)
 	if err != nil {
 		return nil, err
 	}

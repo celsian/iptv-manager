@@ -17,7 +17,7 @@ export function Settings() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    iptv: { apiAddress: '', uid: '', pass: '' },
+    iptv: { provider: 'iptorrents', apiAddress: '', uid: '', pass: '' },
     emby: { apiAddress: '', apiKey: '' },
     playlistSources: [] as PlaylistSource[],
     playlistUpdateTime: '03:00',
@@ -39,6 +39,7 @@ export function Settings() {
       setSettings(data);
       setFormData({
         iptv: {
+          provider: data.iptv.provider || 'iptorrents',
           apiAddress: data.iptv.apiAddress || '',
           uid: data.iptv.uid || '',
           pass: data.iptv.pass || '',
@@ -256,6 +257,31 @@ export function Settings() {
             <h2 className="text-lg font-semibold text-white mb-4">IPTV Settings</h2>
 
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Provider
+                </label>
+                <select
+                  value={formData.iptv.provider}
+                  onChange={e => setFormData(prev => ({
+                    ...prev,
+                    iptv: { ...prev.iptv, provider: e.target.value }
+                  }))}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {(settings?.availableProviders || []).map(provider => (
+                    <option key={provider.type} value={provider.type}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+                {settings?.availableProviders?.find(p => p.type === formData.iptv.provider)?.description && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {settings.availableProviders.find(p => p.type === formData.iptv.provider)?.description}
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">
                   API Address

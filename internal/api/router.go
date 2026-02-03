@@ -14,7 +14,7 @@ import (
 
 type Server struct {
 	cfg             *config.Manager
-	iptvClient      *iptv.Client
+	iptvProvider    iptv.Provider
 	embyClient      *emby.Client
 	channelStore    *channels.Store
 	playlistManager *playlists.Manager
@@ -24,7 +24,7 @@ type Server struct {
 func NewServer(cfg *config.Manager, channelStore *channels.Store, playlistManager *playlists.Manager, staticFS embed.FS) *Server {
 	return &Server{
 		cfg:             cfg,
-		iptvClient:      iptv.NewClient(cfg),
+		iptvProvider:    iptv.NewProvider(cfg),
 		embyClient:      emby.NewClient(cfg),
 		channelStore:    channelStore,
 		playlistManager: playlistManager,
