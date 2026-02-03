@@ -230,7 +230,16 @@ export function EnabledChannels() {
               const url = selectedPlaylist === '__all__'
                 ? `${window.location.origin}/m3u/iptv-manager.m3u`
                 : `${window.location.origin}/m3u/iptv-manager.m3u?group-title=${encodeURIComponent(selectedPlaylist)}`;
-              navigator.clipboard.writeText(url);
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(url);
+              } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+              }
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
             }}
