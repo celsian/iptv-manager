@@ -7,9 +7,10 @@ interface ChannelCardProps {
   onToggle: (channel: IPTVChannel) => void;
   onConfigure: (channel: IPTVChannel) => void;
   isToggling?: boolean;
+  enabledInPlaylist?: string | null;
 }
 
-export function ChannelCard({ channel, onPreview, onToggle, onConfigure, isToggling }: ChannelCardProps) {
+export function ChannelCard({ channel, onPreview, onToggle, onConfigure, isToggling, enabledInPlaylist }: ChannelCardProps) {
   return (
     <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-600 transition-colors">
       <div className="flex items-start justify-between gap-2">
@@ -19,6 +20,9 @@ export function ChannelCard({ channel, onPreview, onToggle, onConfigure, isToggl
           </h3>
           {channel.group && (
             <p className="text-xs text-slate-400 mt-0.5">{channel.group}</p>
+          )}
+          {enabledInPlaylist && (
+            <p className="text-xs text-amber-400 mt-0.5">In: {enabledInPlaylist}</p>
           )}
         </div>
 

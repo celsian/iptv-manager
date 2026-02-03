@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- Slate gradient background matching frontend -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" /> <!-- slate-900 -->
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" /> <!-- slate-800 -->
+    </linearGradient>
+    <!-- Blue glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Inner shadow -->
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 0" />
+      </feComponentTransfer>
+      <feGaussianBlur stdDeviation="4"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feFlood flood-color="#000" flood-opacity="0.3" result="color"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feComposite in2="SourceAlpha" operator="in" />
+      <feMerge>
+        <feMergeNode in="SourceGraphic" />
+        <feMergeNode />
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer stroke/ring - blue-500 -->
+  <circle cx="256" cy="256" r="250" fill="none" stroke="#3b82f6" stroke-width="6"/>
+  
+  <!-- Circular background -->
+  <circle cx="256" cy="256" r="247" fill="url(#bgGradient)"/>
+  
+  <!-- Inner subtle ring -->
+  <circle cx="256" cy="256" r="215" fill="none" stroke="#334155" stroke-width="1" opacity="0.5"/>
+  
+  <!-- TV Icon with glow - centered visually (accounting for antenna) -->
+  <g transform="translate(256, 240)" filter="url(#glow)">
+    <g transform="translate(-120, -110) scale(10)" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- TV frame -->
+      <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
+      <!-- TV antenna -->
+      <polyline points="17 2 12 7 7 2"/>
+    </g>
+  </g>
+  
+  <!-- Screen reflection/highlight -->
+  <g transform="translate(256, 240)">
+    <g transform="translate(-120, -110) scale(10)">
+      <rect x="4" y="9" width="8" height="5" rx="1" fill="#3b82f6" opacity="0.15"/>
+    </g>
+  </g>
+</svg>

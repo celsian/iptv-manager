@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, LayoutGrid, List, Filter } from 'lucide-react';
-import { api, type IPTVChannel, type PlaylistSource } from '../lib/api';
+import { api, type IPTVChannel, type PlaylistSource, type Channel } from '../lib/api';
 import { ChannelCard } from './ChannelCard';
 import { StreamPreview } from './StreamPreview';
 import { ChannelConfigModal } from './ChannelConfigModal';
@@ -11,6 +11,7 @@ export function ChannelSearch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
   const [channels, setChannels] = useState<IPTVChannel[]>([]);
+  const [savedChannels, setSavedChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +32,29 @@ export function ChannelSearch() {
 
   useEffect(() => {
     loadPlaylists();
+    loadSavedChannels();
   }, []);
+
+  const loadSavedChannels = async () => {
+    try {
+      const channels = await api.channels.list();
+      setSavedChannels(channels || []);
+    } catch (err) {
+      console.error('Failed to load saved channels:', err);
+    }
+  };
+
+  // Get the playlist name where a channel is enabled (if not current playlist)
+  const getEnabledInOtherPlaylist = (channelId: string): string | null => {
+    // Saved channels have iptvId with "ch" prefix (e.g., "ch113130")
+    // Search results have raw ID (e.g., "113130")
+    const normalizedId = channelId.startsWith('ch') ? channelId : `ch${channelId}`;
+    const saved = savedChannels.find(ch => ch.iptvId === normalizedId);
+    if (saved && saved.playlist !== selectedPlaylist) {
+      return saved.playlist;
+    }
+    return null;
+  };
 
   // Get the IPTV playlist name for the selected playlist
   const getIptvPlaylist = (playlistName: string) => {
@@ -245,6 +268,7 @@ export function ChannelSearch() {
                     onToggle={handleToggle}
                     onConfigure={setConfigChannel}
                     isToggling={togglingIds.has(channel.id)}
+                    enabledInPlaylist={getEnabledInOtherPlaylist(channel.id)}
                   />
                 ))}
               </div>
@@ -261,6 +285,7 @@ export function ChannelSearch() {
               onToggle={handleToggle}
               onConfigure={setConfigChannel}
               isToggling={togglingIds.has(channel.id)}
+              enabledInPlaylist={getEnabledInOtherPlaylist(channel.id)}
             />
           ))}
         </div>
