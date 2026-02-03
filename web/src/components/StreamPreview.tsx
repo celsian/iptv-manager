@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import mpegts from 'mpegts.js';
-import { X, Loader2, ExternalLink } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface StreamPreviewProps {
@@ -162,12 +162,6 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
 
   const [copied, setCopied] = useState(false);
 
-  const openInVLC = () => {
-    if (streamUrl) {
-      window.open(`vlc://${streamUrl}`, '_blank');
-    }
-  };
-
   const copyUrl = () => {
     if (streamUrl) {
       if (navigator.clipboard) {
@@ -207,12 +201,22 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
                 </div>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-700 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyUrl}
+                disabled={!streamUrl}
+                className={`px-3 py-1.5 ${copied ? 'bg-emerald-600' : 'bg-slate-600 hover:bg-slate-500'} disabled:opacity-50 text-white text-sm rounded-lg transition-colors`}
+                title="Copy URL"
+              >
+                {copied ? 'Copied!' : 'Copy URL'}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-slate-700 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           
           <div 
@@ -231,21 +235,12 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
             {error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                 <p className="text-red-400">{error}</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={openInVLC}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open in VLC
-                  </button>
-                  <button
-                    onClick={copyUrl}
-                    className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors"
-                  >
-                    {copied ? 'Copied!' : 'Copy URL'}
-                  </button>
-                </div>
+                <button
+                  onClick={copyUrl}
+                  className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors"
+                >
+                  {copied ? 'Copied!' : 'Copy URL'}
+                </button>
               </div>
             )}
             

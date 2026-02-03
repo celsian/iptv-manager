@@ -134,6 +134,25 @@ func (s *Store) GetAllChannels() []*Channel {
 	return channels
 }
 
+// GetStreamBaseURL extracts the base URL (without channel ID) from any saved channel
+// Returns empty string if no channels have URLs
+func (s *Store) GetStreamBaseURL() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, ch := range s.channels {
+		if ch.URL != "" {
+			// URL format: https://host/uid/pass/channelId
+			// Remove the last segment (channel ID) to get base URL
+			lastSlash := strings.LastIndex(ch.URL, "/")
+			if lastSlash > 0 {
+				return ch.URL[:lastSlash]
+			}
+		}
+	}
+	return ""
+}
+
 func (s *Store) GetEnabledChannels() []*Channel {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

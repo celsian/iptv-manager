@@ -77,6 +77,20 @@ func (s *Server) handlePreviewURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fallback: construct URL using base URL from an existing saved channel
+	// Extract numeric ID (remove "ch" prefix if present)
+	numericID := channelID
+	if len(channelID) > 2 && channelID[:2] == "ch" {
+		numericID = channelID[2:]
+	}
+
+	// Get base URL pattern from any saved channel
+	if baseURL := s.channelStore.GetStreamBaseURL(); baseURL != "" {
+		url := baseURL + "/" + numericID
+		respondJSON(w, map[string]string{"url": url})
+		return
+	}
+
 	http.Error(w, "Unable to determine stream URL", http.StatusInternalServerError)
 }
 
