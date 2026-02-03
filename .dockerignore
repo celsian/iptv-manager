@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+web/dist/
+*.exe
+iptv-manager
+migrate-channels
+
+# Data files (will be mounted as volume)
+data/
+playlists/
+*.json
+*.m3u
+*.backup
+
+# Development
+.git/
+.gitignore
+*.md
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

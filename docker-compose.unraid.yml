@@ -1,0 +1,16 @@
+version: '3.8'
+
+# Example docker-compose for Unraid
+# Map /data to your appdata folder
+
+services:
+  iptv-manager:
+    image: iptv-manager:latest
+    container_name: iptv-manager
+    ports:
+      - "8080:8080"
+    volumes:
+      - /mnt/user/appdata/iptv-manager:/data
+    environment:
+      - TZ=America/Los_Angeles
+    restart: unless-stopped

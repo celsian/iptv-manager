@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  iptv-manager:
+    build: .
+    container_name: iptv-manager
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - TZ=America/Los_Angeles
+    restart: unless-stopped
