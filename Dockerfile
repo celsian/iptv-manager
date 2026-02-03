@@ -1,15 +1,15 @@
 # Frontend build stage
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app/web
+WORKDIR /app
 
 # Copy package files
-COPY web/package*.json ./
-RUN npm ci
+COPY web/package*.json ./web/
+RUN cd web && npm ci
 
 # Copy frontend source and build
-COPY web/ ./
-RUN npm run build
+COPY web/ ./web/
+RUN cd web && npm run build
 
 # Backend build stage
 FROM golang:1.25-alpine AS backend-builder
@@ -24,7 +24,7 @@ RUN go mod download
 COPY . .
 
 # Copy built frontend
-COPY --from=frontend-builder /app/web/dist ./cmd/server/web/dist
+COPY --from=frontend-builder /app/cmd/server/web/dist ./cmd/server/web/dist
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o iptv-manager ./cmd/server
