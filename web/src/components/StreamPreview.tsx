@@ -168,23 +168,20 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
     }
   };
 
-  const copyUrl = async () => {
+  const copyUrl = () => {
     if (streamUrl) {
-      try {
-        await navigator.clipboard.writeText(streamUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        // Fallback for older browsers or when clipboard API fails
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(streamUrl);
+      } else {
         const textArea = document.createElement('textarea');
         textArea.value = streamUrl;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
       }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
