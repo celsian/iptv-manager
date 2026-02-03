@@ -399,7 +399,7 @@ export function Settings() {
                   >
                     {editingIndex === originalIndex ? (
                       <div className="space-y-2">
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             type="text"
                             value={editSource.name}
@@ -492,7 +492,7 @@ export function Settings() {
             {/* Add new playlist */}
             <div className="space-y-2 p-3 bg-slate-700/50 rounded-lg border border-dashed border-slate-600">
               <p className="text-sm text-slate-400 mb-2">Add new playlist source:</p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={newSource.name}

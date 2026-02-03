@@ -23,24 +23,34 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
 
-  // Calculate display dimensions - native unless 4K, then cap at 1080p
+  // Calculate display dimensions - fill screen on mobile, otherwise native up to 1080p
   const getDisplayDimensions = () => {
-    if (!streamInfo) return { width: 1280, height: 720 };
+    const maxWidth = window.innerWidth - 16; // Small margin on mobile
+    const maxHeight = window.innerHeight - 80; // Leave room for header
+    const isMobile = window.innerWidth < 768;
+    
+    if (!streamInfo) {
+      // Default dimensions, but cap to screen
+      const defaultWidth = Math.min(1280, maxWidth);
+      const defaultHeight = Math.min(720, maxHeight);
+      const scale = Math.min(defaultWidth / 1280, defaultHeight / 720);
+      return { 
+        width: Math.round(1280 * scale), 
+        height: Math.round(720 * scale) 
+      };
+    }
     
     let { width, height } = streamInfo;
     
-    // If 4K or larger, scale down to 1080p equivalent
+    // If 4K or larger, scale down to 1080p equivalent first
     if (width >= 3840 || height >= 2160) {
       const scale = Math.min(1920 / width, 1080 / height);
       width = Math.round(width * scale);
       height = Math.round(height * scale);
     }
     
-    // Cap max dimensions to viewport
-    const maxWidth = window.innerWidth - 64;
-    const maxHeight = window.innerHeight - 200;
-    
-    if (width > maxWidth || height > maxHeight) {
+    // On mobile or small screens, fill the available space
+    if (isMobile || width > maxWidth || height > maxHeight) {
       const scale = Math.min(maxWidth / width, maxHeight / height);
       width = Math.round(width * scale);
       height = Math.round(height * scale);
@@ -180,19 +190,26 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="relative mx-4" style={{ width: displayDimensions.width }}>
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-full sm:w-auto" 
+        style={{ width: window.innerWidth < 640 ? '100%' : displayDimensions.width }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="bg-slate-800 rounded-lg overflow-hidden shadow-2xl">
-          <div className="flex items-center justify-between p-4 border-b border-slate-700">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold text-white">{channelName}</h3>
+          <div className="flex items-center justify-between p-2 sm:p-4 border-b border-slate-700 gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <h3 className="font-semibold text-white text-sm sm:text-lg truncate">{channelName}</h3>
               {streamInfo && (
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <span className="px-2 py-0.5 bg-slate-700 rounded">
+                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-slate-400">
+                  <span className="px-1.5 sm:px-2 py-0.5 bg-slate-700 rounded">
                     {streamInfo.width}x{streamInfo.height}
                   </span>
                   {streamInfo.frameRate && (
-                    <span className="px-2 py-0.5 bg-slate-700 rounded">
+                    <span className="px-1.5 sm:px-2 py-0.5 bg-slate-700 rounded">
                       {Number.isInteger(streamInfo.frameRate) 
                         ? streamInfo.frameRate 
                         : streamInfo.frameRate.toFixed(2)} fps
@@ -201,18 +218,18 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <button
                 onClick={copyUrl}
                 disabled={!streamUrl}
-                className={`px-3 py-1.5 ${copied ? 'bg-emerald-600' : 'bg-slate-600 hover:bg-slate-500'} disabled:opacity-50 text-white text-sm rounded-lg transition-colors`}
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 ${copied ? 'bg-emerald-600' : 'bg-slate-600 hover:bg-slate-500'} disabled:opacity-50 text-white text-xs sm:text-sm rounded-lg transition-colors`}
                 title="Copy URL"
               >
                 {copied ? 'Copied!' : 'Copy URL'}
               </button>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-slate-700 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
