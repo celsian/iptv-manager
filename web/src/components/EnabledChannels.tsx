@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Play, Settings2, Tv, PowerOff } from 'lucide-react';
+import { Loader2, RefreshCw, Play, Settings2, Tv, PowerOff, Copy, Check } from 'lucide-react';
 import { api, type PlaylistChannel, type IPTVChannel, type PlaylistSource } from '../lib/api';
 import { StreamPreview } from './StreamPreview';
 import { ChannelConfigModal, type SavedChannelData } from './ChannelConfigModal';
@@ -35,6 +35,7 @@ export function EnabledChannels() {
   const [refreshingEmby, setRefreshingEmby] = useState(false);
   const [embySuccess, setEmbySuccess] = useState(false);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
@@ -213,16 +214,32 @@ export function EnabledChannels() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <select
-          value={selectedPlaylist}
-          onChange={e => setSelectedPlaylist(e.target.value)}
-          className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="__all__">All Playlists</option>
-          {playlistSources.map(source => (
-            <option key={source.name} value={source.name}>{source.name}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedPlaylist}
+            onChange={e => setSelectedPlaylist(e.target.value)}
+            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="__all__">All Playlists</option>
+            {playlistSources.map(source => (
+              <option key={source.name} value={source.name}>{source.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              const url = selectedPlaylist === '__all__'
+                ? `${window.location.origin}/m3u/iptv-manager.m3u`
+                : `${window.location.origin}/m3u/iptv-manager.m3u?group-title=${encodeURIComponent(selectedPlaylist)}`;
+              navigator.clipboard.writeText(url);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            className={`p-2 ${copied ? 'bg-emerald-600' : 'bg-slate-700 hover:bg-slate-600'} text-white rounded-lg transition-colors`}
+            title="Copy M3U URL"
+          >
+            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+          </button>
+        </div>
 
         <div className="flex gap-2">
           <button
