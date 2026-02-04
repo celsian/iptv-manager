@@ -159,6 +159,8 @@ export function EnabledChannels() {
       // Use the channel's playlist for the IPTV toggle (important for "All" view)
       const iptvPlaylist = getIptvPlaylistForChannel(channel);
       await api.iptv.toggle(iptvPlaylist, channel.id, false);
+      // Disable in local channel store (frees up the channel number)
+      await api.channels.disable(channel.id, channel.playlist);
       // Mark the channel's playlist as dirty so it gets refreshed
       await api.playlists.markDirty(channel.playlist);
       // Remove from list
