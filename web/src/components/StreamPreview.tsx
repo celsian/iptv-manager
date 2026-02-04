@@ -71,11 +71,14 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
         
         setStreamUrl(url);
 
+        // Use proxy endpoint to avoid CORS issues when behind reverse proxy
+        const proxyUrl = `/api/preview/${channelId}`;
+
         if (mpegts.isSupported()) {
           const player = mpegts.createPlayer({
             type: 'mpegts',
             isLive: true,
-            url: url,
+            url: proxyUrl,
           }, {
             enableWorker: true,
             liveBufferLatencyChasing: true,
