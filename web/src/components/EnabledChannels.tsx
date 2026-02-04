@@ -190,12 +190,6 @@ export function EnabledChannels() {
       <div className="space-y-4">
         <p className="text-slate-400">Select a playlist to configure channels:</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          <button
-            onClick={() => selectPlaylist('__all__')}
-            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 border border-blue-500 hover:border-blue-400 rounded-lg text-white font-medium transition-colors text-center"
-          >
-            All Playlists
-          </button>
           {playlistSources.map(source => (
             <button
               key={source.name}
@@ -205,6 +199,12 @@ export function EnabledChannels() {
               {source.name}
             </button>
           ))}
+          <button
+            onClick={() => selectPlaylist('__all__')}
+            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 border border-blue-500 hover:border-blue-400 rounded-lg text-white font-medium transition-colors text-center"
+          >
+            All Playlists
+          </button>
         </div>
         {playlistSources.length === 0 && (
           <p className="text-slate-500">No playlists available. Configure playlist sources in Settings.</p>
@@ -222,10 +222,10 @@ export function EnabledChannels() {
             onChange={e => setSelectedPlaylist(e.target.value)}
             className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="__all__">All Playlists</option>
             {playlistSources.map(source => (
               <option key={source.name} value={source.name}>{source.name}</option>
             ))}
+            <option value="__all__">All Playlists</option>
           </select>
           <button
             onClick={() => {
