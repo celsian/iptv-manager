@@ -110,6 +110,17 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fallback: construct URL using base URL from an existing saved channel
+	if streamURL == "" {
+		numericID := channelID
+		if len(channelID) > 2 && channelID[:2] == "ch" {
+			numericID = channelID[2:]
+		}
+		if baseURL := s.channelStore.GetStreamBaseURL(); baseURL != "" {
+			streamURL = baseURL + "/" + numericID
+		}
+	}
+
 	if streamURL == "" {
 		http.Error(w, "Unable to determine stream URL", http.StatusInternalServerError)
 		return
