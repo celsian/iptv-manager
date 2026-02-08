@@ -50,6 +50,34 @@ func (m *Manager) GetPlaylistPath(name string) string {
 	return filepath.Join(m.dataDir, "playlists", name+".m3u")
 }
 
+func (m *Manager) RenamePlaylist(oldName, newName string) error {
+	oldPath := m.GetPlaylistPath(oldName)
+	newPath := m.GetPlaylistPath(newName)
+
+	if _, err := os.Stat(oldPath); err != nil {
+		return nil // old file doesn't exist, nothing to rename
+	}
+
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("failed to rename playlist file: %w", err)
+	}
+
+	// Update cache
+	m.mu.Lock()
+	if channels, ok := m.cachedChannels[oldName]; ok {
+		m.cachedChannels[newName] = channels
+		delete(m.cachedChannels, oldName)
+	}
+	if dirty, ok := m.dirtyPlaylists[oldName]; ok {
+		m.dirtyPlaylists[newName] = dirty
+		delete(m.dirtyPlaylists, oldName)
+	}
+	m.mu.Unlock()
+
+	log.Printf("Renamed playlist file: %s -> %s", oldName, newName)
+	return nil
+}
+
 func (m *Manager) MarkDirty(playlist string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

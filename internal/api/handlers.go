@@ -238,6 +238,24 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		newCfg.Emby.APIKey = currentCfg.Emby.APIKey
 	}
 
+	// Detect playlist name changes and rename files/channels
+	if len(currentCfg.PlaylistSources) == len(newCfg.PlaylistSources) {
+		for i := range newCfg.PlaylistSources {
+			oldName := currentCfg.PlaylistSources[i].Name
+			newName := newCfg.PlaylistSources[i].Name
+			if oldName != "" && newName != "" && oldName != newName {
+				if err := s.playlistManager.RenamePlaylist(oldName, newName); err != nil {
+					http.Error(w, "Failed to rename playlist: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				if err := s.channelStore.RenamePlaylist(oldName, newName); err != nil {
+					http.Error(w, "Failed to update channels: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+	}
+
 	if err := s.cfg.Update(newCfg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -22,9 +22,19 @@ const sortChannels = (channels: PlaylistChannel[]): PlaylistChannel[] => {
   });
 };
 
-export function EnabledChannels() {
+interface EnabledChannelsProps {
+  initialPlaylist?: string;
+  onPlaylistChange?: (playlist: string) => void;
+}
+
+export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledChannelsProps) {
   const [playlistSources, setPlaylistSources] = useState<PlaylistSource[]>([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState('');
+  const [selectedPlaylist, _setSelectedPlaylist] = useState(initialPlaylist || '');
+
+  const setSelectedPlaylist = (playlist: string) => {
+    _setSelectedPlaylist(playlist);
+    onPlaylistChange?.(playlist);
+  };
   const [channels, setChannels] = useState<PlaylistChannel[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
