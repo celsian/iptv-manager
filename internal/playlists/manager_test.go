@@ -191,6 +191,9 @@ http://stream.example.com/789
 	if cnn.Enabled {
 		t.Error("CNN should be disabled after being removed from playlist")
 	}
+	if cnn.ChannelNumber != 200 {
+		t.Errorf("CNN channel number should be preserved, got %d", cnn.ChannelNumber)
+	}
 
 	// ESPN and BBC should still be enabled
 	espn, _ := channelStore.GetChannel("ch123")

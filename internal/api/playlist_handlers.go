@@ -174,6 +174,12 @@ func (s *Server) handleGetPlaylistChannels(w http.ResponseWriter, r *http.Reques
 		if localCh, ok := s.channelStore.GetChannel(channelID); ok {
 			ch.CustomName = localCh.CustomName
 			ch.ChannelNumber = localCh.ChannelNumber
+			// If the stored channel is disabled and its number is now taken, clear it
+			if !localCh.Enabled && localCh.ChannelNumber > 0 {
+				if s.channelStore.IsChannelNumberTaken(localCh.ChannelNumber, channelID) {
+					ch.ChannelNumber = 0
+				}
+			}
 			if localCh.GroupTitle != "" {
 				ch.GroupTitle = localCh.GroupTitle
 			}
