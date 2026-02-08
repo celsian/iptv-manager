@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/celsian/iptv-manager/internal/channels"
 )
@@ -164,6 +165,7 @@ func (s *Server) handleLocalChannelDisable(w http.ResponseWriter, r *http.Reques
 
 	// Disable locally
 	ch.Enabled = false
+	ch.DisabledAt = time.Now().Format(time.RFC3339)
 	if err := s.channelStore.SetChannel(ch); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

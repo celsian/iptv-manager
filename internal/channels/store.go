@@ -2,12 +2,14 @@ package channels
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Channel struct {
@@ -20,6 +22,7 @@ type Channel struct {
 	URL           string `json:"url"`
 	Enabled       bool   `json:"enabled"`
 	Playlist      string `json:"playlist"`
+	DisabledAt    string `json:"disabledAt,omitempty"`
 }
 
 type Store struct {
@@ -428,6 +431,42 @@ func (s *Store) RenamePlaylist(oldName, newName string) error {
 	}
 	s.mu.Unlock()
 	return s.Save()
+}
+
+// CleanupStaleChannels removes disabled channels that have been disabled longer than the retention period.
+// Returns the number of channels removed.
+func (s *Store) CleanupStaleChannels(retentionDays int) (int, error) {
+	s.mu.Lock()
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	var toDelete []string
+
+	for id, ch := range s.channels {
+		if !ch.Enabled && ch.DisabledAt != "" {
+			disabledAt, err := time.Parse(time.RFC3339, ch.DisabledAt)
+			if err != nil {
+				continue
+			}
+			if disabledAt.Before(cutoff) {
+				toDelete = append(toDelete, id)
+			}
+		}
+	}
+
+	for _, id := range toDelete {
+		log.Printf("Cleaning up stale channel: %s (disabled since %s)", id, s.channels[id].DisabledAt)
+		delete(s.channels, id)
+	}
+
+	s.mu.Unlock()
+
+	if len(toDelete) > 0 {
+		if err := s.Save(); err != nil {
+			return len(toDelete), err
+		}
+	}
+
+	return len(toDelete), nil
 }
 
 // ExtractNumericID extracts numeric ID from IPTV channel ID (e.g., "ch12345" -> "12345")
