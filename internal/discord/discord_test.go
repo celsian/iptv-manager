@@ -52,20 +52,21 @@ func TestSendTestMessage(t *testing.T) {
 }
 
 func TestSendRemovedChannelsNotificationEmptyURL(t *testing.T) {
-	err := SendRemovedChannelsNotification("", "Test", []RemovedChannel{{Name: "Test"}})
+	removed := map[string][]RemovedChannel{"Test": {{Name: "Test"}}}
+	err := SendRemovedChannelsNotification("", removed)
 	if err != nil {
 		t.Error("SendRemovedChannelsNotification should silently skip empty URL")
 	}
 }
 
-func TestSendRemovedChannelsNotificationEmptyChannels(t *testing.T) {
-	err := SendRemovedChannelsNotification("http://example.com", "Test", []RemovedChannel{})
+func TestSendRemovedChannelsNotificationEmptyMap(t *testing.T) {
+	err := SendRemovedChannelsNotification("http://example.com", map[string][]RemovedChannel{})
 	if err != nil {
-		t.Error("SendRemovedChannelsNotification should silently skip empty channel list")
+		t.Error("SendRemovedChannelsNotification should silently skip empty map")
 	}
 }
 
-func TestSendRemovedChannelsNotification(t *testing.T) {
+func TestSendRemovedChannelsNotificationSinglePlaylist(t *testing.T) {
 	var receivedMsg WebhookMessage
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,13 +75,14 @@ func TestSendRemovedChannelsNotification(t *testing.T) {
 	}))
 	defer server.Close()
 
-	channels := []RemovedChannel{
-		{Name: "ESPN HD", ChannelNumber: 100, GroupTitle: "Sports", Playlist: "Sports"},
-		{Name: "CNN", ChannelNumber: 200, GroupTitle: "News", Playlist: "News"},
-		{Name: "Unknown", ChannelNumber: 0, GroupTitle: "Other", Playlist: "Other"}, // no channel number
+	removed := map[string][]RemovedChannel{
+		"TestPlaylist": {
+			{Name: "ESPN HD", ChannelNumber: 100},
+			{Name: "CNN", ChannelNumber: 200},
+		},
 	}
 
-	err := SendRemovedChannelsNotification(server.URL, "TestPlaylist", channels)
+	err := SendRemovedChannelsNotification(server.URL, removed)
 	if err != nil {
 		t.Fatalf("SendRemovedChannelsNotification failed: %v", err)
 	}
@@ -96,19 +98,45 @@ func TestSendRemovedChannelsNotification(t *testing.T) {
 	if embed.Color != 0xFF0000 {
 		t.Errorf("Color = %x, want %x (red)", embed.Color, 0xFF0000)
 	}
-
 	if len(embed.Fields) != 1 {
 		t.Fatalf("Expected 1 field, got %d", len(embed.Fields))
 	}
+	if embed.Fields[0].Name != "TestPlaylist:" {
+		t.Errorf("Field name = %q, want %q", embed.Fields[0].Name, "TestPlaylist:")
+	}
+}
 
-	field := embed.Fields[0]
-	if field.Name != "TestPlaylist:" {
-		t.Errorf("Field name = %q, want %q", field.Name, "TestPlaylist:")
+func TestSendRemovedChannelsNotificationMultiplePlaylists(t *testing.T) {
+	var receivedMsg WebhookMessage
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&receivedMsg)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	removed := map[string][]RemovedChannel{
+		"Sports": {
+			{Name: "ESPN HD", ChannelNumber: 100},
+		},
+		"News": {
+			{Name: "CNN", ChannelNumber: 200},
+			{Name: "BBC", ChannelNumber: 0},
+		},
 	}
 
-	// Check field value contains channel info
-	if field.Value == "" {
-		t.Error("Field value should not be empty")
+	err := SendRemovedChannelsNotification(server.URL, removed)
+	if err != nil {
+		t.Fatalf("SendRemovedChannelsNotification failed: %v", err)
+	}
+
+	if len(receivedMsg.Embeds) != 1 {
+		t.Fatalf("Expected 1 embed (consolidated), got %d", len(receivedMsg.Embeds))
+	}
+
+	embed := receivedMsg.Embeds[0]
+	if len(embed.Fields) != 2 {
+		t.Fatalf("Expected 2 fields (one per playlist), got %d", len(embed.Fields))
 	}
 }
 
@@ -121,16 +149,16 @@ func TestSendRemovedChannelsNotificationFormatting(t *testing.T) {
 	}))
 	defer server.Close()
 
-	channels := []RemovedChannel{
-		{Name: "With Number", ChannelNumber: 42},
-		{Name: "Without Number", ChannelNumber: 0},
+	removed := map[string][]RemovedChannel{
+		"Test": {
+			{Name: "With Number", ChannelNumber: 42},
+			{Name: "Without Number", ChannelNumber: 0},
+		},
 	}
 
-	SendRemovedChannelsNotification(server.URL, "Test", channels)
+	SendRemovedChannelsNotification(server.URL, removed)
 
 	value := receivedMsg.Embeds[0].Fields[0].Value
-	
-	// Channel with number should show "**42** - With Number"
 	if value == "" {
 		t.Error("Field value should contain formatted channels")
 	}

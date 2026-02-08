@@ -87,6 +87,27 @@ func (m *Manager) UpdatePlaylist(playlist string) error {
 }
 
 func (m *Manager) UpdatePlaylistWithNotify(playlist string, sendNotifications bool) error {
+	removed, err := m.updatePlaylistInternal(playlist)
+	if err != nil {
+		return err
+	}
+
+	if sendNotifications && len(removed) > 0 {
+		cfg := m.cfg.Get()
+		if cfg.DiscordWebhook != "" {
+			allRemoved := map[string][]discord.RemovedChannel{playlist: removed}
+			if err := discord.SendRemovedChannelsNotification(cfg.DiscordWebhook, allRemoved); err != nil {
+				log.Printf("Failed to send Discord notification: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// updatePlaylistInternal downloads the playlist, disables removed channels, and
+// returns the list of removed channels for notification purposes.
+func (m *Manager) updatePlaylistInternal(playlist string) ([]discord.RemovedChannel, error) {
 	cfg := m.cfg.Get()
 
 	var sourceURL string
@@ -98,43 +119,40 @@ func (m *Manager) UpdatePlaylistWithNotify(playlist string, sendNotifications bo
 	}
 
 	if sourceURL == "" {
-		return fmt.Errorf("playlist source not found: %s", playlist)
+		return nil, fmt.Errorf("playlist source not found: %s", playlist)
 	}
 
 	// Get existing channels before update for comparison
-	var existingChannels []PlaylistChannel
-	if sendNotifications {
-		existingChannels = m.GetPlaylistChannels(playlist)
-	}
+	existingChannels := m.GetPlaylistChannels(playlist)
 
 	// Download the playlist
 	resp, err := http.Get(sourceURL)
 	if err != nil {
-		return fmt.Errorf("failed to download playlist: %w", err)
+		return nil, fmt.Errorf("failed to download playlist: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download playlist: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to download playlist: status %d", resp.StatusCode)
 	}
 
 	// Ensure playlists directory exists
 	playlistDir := filepath.Join(m.dataDir, "playlists")
 	if err := os.MkdirAll(playlistDir, 0755); err != nil {
-		return fmt.Errorf("failed to create playlists directory: %w", err)
+		return nil, fmt.Errorf("failed to create playlists directory: %w", err)
 	}
 
 	// Save to file
 	playlistPath := m.GetPlaylistPath(playlist)
 	file, err := os.Create(playlistPath)
 	if err != nil {
-		return fmt.Errorf("failed to create playlist file: %w", err)
+		return nil, fmt.Errorf("failed to create playlist file: %w", err)
 	}
 	defer file.Close()
 
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to write playlist file: %w", err)
+		return nil, fmt.Errorf("failed to write playlist file: %w", err)
 	}
 
 	// Clear cache for this playlist
@@ -142,34 +160,30 @@ func (m *Manager) UpdatePlaylistWithNotify(playlist string, sendNotifications bo
 	delete(m.cachedChannels, playlist)
 	m.mu.Unlock()
 
-	// Check for removed channels and send notifications
-	if sendNotifications && cfg.DiscordWebhook != "" {
-		newChannels := m.GetPlaylistChannels(playlist)
-		removedChannels := findRemovedChannels(existingChannels, newChannels)
+	// Detect removed channels and disable in local store
+	newChannels := m.GetPlaylistChannels(playlist)
+	removedChannels := findRemovedChannels(existingChannels, newChannels)
 
-		if len(removedChannels) > 0 {
-			discordRemoved := make([]discord.RemovedChannel, len(removedChannels))
-			for i, ch := range removedChannels {
-				// Look up channel number from local store using URL
-				var channelNumber int
-				if m.channelStore != nil {
-					// Extract channel ID from URL (last segment)
-					parts := strings.Split(ch.URL, "/")
-					if len(parts) > 0 {
-						channelID := "ch" + parts[len(parts)-1]
-						if storedCh, ok := m.channelStore.GetChannel(channelID); ok {
-							channelNumber = storedCh.ChannelNumber
-						}
+	var discordRemoved []discord.RemovedChannel
+
+	for _, ch := range removedChannels {
+		if m.channelStore != nil {
+			parts := strings.Split(ch.URL, "/")
+			if len(parts) > 0 {
+				channelID := "ch" + parts[len(parts)-1]
+				if storedCh, ok := m.channelStore.GetChannel(channelID); ok {
+					discordRemoved = append(discordRemoved, discord.RemovedChannel{
+						Name:          ch.Name,
+						ChannelNumber: storedCh.ChannelNumber,
+						Playlist:      playlist,
+					})
+					storedCh.Enabled = false
+					if err := m.channelStore.SetChannel(storedCh); err != nil {
+						log.Printf("Failed to disable removed channel %s: %v", channelID, err)
+					} else {
+						log.Printf("Disabled removed channel %s (%s) from playlist %s", channelID, ch.Name, playlist)
 					}
 				}
-				discordRemoved[i] = discord.RemovedChannel{
-					Name:          ch.Name,
-					ChannelNumber: channelNumber,
-					Playlist:      playlist,
-				}
-			}
-			if err := discord.SendRemovedChannelsNotification(cfg.DiscordWebhook, playlist, discordRemoved); err != nil {
-				log.Printf("Failed to send Discord notification: %v", err)
 			}
 		}
 	}
@@ -180,7 +194,7 @@ func (m *Manager) UpdatePlaylistWithNotify(playlist string, sendNotifications bo
 	}
 
 	log.Printf("Updated playlist: %s", playlist)
-	return nil
+	return discordRemoved, nil
 }
 
 func findRemovedChannels(old, new []PlaylistChannel) []PlaylistChannel {
@@ -362,10 +376,15 @@ func (m *Manager) runScheduler() {
 func (m *Manager) updateAllPlaylists() {
 	cfg := m.cfg.Get()
 
+	allRemoved := make(map[string][]discord.RemovedChannel)
+
 	for i, source := range cfg.PlaylistSources {
 		log.Printf("Updating playlist: %s", source.Name)
-		if err := m.UpdatePlaylistWithNotify(source.Name, true); err != nil {
+		removed, err := m.updatePlaylistInternal(source.Name)
+		if err != nil {
 			log.Printf("Failed to update playlist %s: %v", source.Name, err)
+		} else if len(removed) > 0 {
+			allRemoved[source.Name] = removed
 		}
 
 		// Add delay between updates (except for last one)
@@ -374,7 +393,13 @@ func (m *Manager) updateAllPlaylists() {
 		}
 	}
 
-	// Update last update time in config
+	// Send one consolidated notification for all playlists
+	if len(allRemoved) > 0 && cfg.DiscordWebhook != "" {
+		if err := discord.SendRemovedChannelsNotification(cfg.DiscordWebhook, allRemoved); err != nil {
+			log.Printf("Failed to send Discord notification: %v", err)
+		}
+	}
+
 	log.Printf("All playlists updated at %s", time.Now().Format(time.RFC3339))
 }
 
