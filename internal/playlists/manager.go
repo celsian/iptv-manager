@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/celsian/iptv-manager/internal/channels"
 	"github.com/celsian/iptv-manager/internal/config"
 	"github.com/celsian/iptv-manager/internal/discord"
 )
@@ -26,6 +27,7 @@ type PlaylistChannel struct {
 
 type Manager struct {
 	cfg            *config.Manager
+	channelStore   *channels.Store
 	dataDir        string
 	mu             sync.RWMutex
 	dirtyPlaylists map[string]bool
@@ -33,9 +35,10 @@ type Manager struct {
 	stopScheduler  chan struct{}
 }
 
-func NewManager(cfg *config.Manager, dataDir string) *Manager {
+func NewManager(cfg *config.Manager, channelStore *channels.Store, dataDir string) *Manager {
 	return &Manager{
 		cfg:            cfg,
+		channelStore:   channelStore,
 		dataDir:        dataDir,
 		dirtyPlaylists: make(map[string]bool),
 		cachedChannels: make(map[string][]PlaylistChannel),
@@ -147,9 +150,22 @@ func (m *Manager) UpdatePlaylistWithNotify(playlist string, sendNotifications bo
 		if len(removedChannels) > 0 {
 			discordRemoved := make([]discord.RemovedChannel, len(removedChannels))
 			for i, ch := range removedChannels {
+				// Look up channel number from local store using URL
+				var channelNumber int
+				if m.channelStore != nil {
+					// Extract channel ID from URL (last segment)
+					parts := strings.Split(ch.URL, "/")
+					if len(parts) > 0 {
+						channelID := "ch" + parts[len(parts)-1]
+						if storedCh, ok := m.channelStore.GetChannel(channelID); ok {
+							channelNumber = storedCh.ChannelNumber
+						}
+					}
+				}
 				discordRemoved[i] = discord.RemovedChannel{
-					Name:     ch.Name,
-					Playlist: playlist,
+					Name:          ch.Name,
+					ChannelNumber: channelNumber,
+					Playlist:      playlist,
 				}
 			}
 			if err := discord.SendRemovedChannelsNotification(cfg.DiscordWebhook, playlist, discordRemoved); err != nil {
