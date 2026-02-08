@@ -193,6 +193,54 @@ func TestHandleLocalChannelGet(t *testing.T) {
 	}
 }
 
+func TestHandleLocalChannelGetDisabledNumberTaken(t *testing.T) {
+	server, _ := setupTestServer(t)
+
+	// Channel A is disabled on channel 100
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "chA", Name: "Channel A", ChannelNumber: 100, Enabled: false,
+	})
+	// Channel B has taken channel 100
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "chB", Name: "Channel B", ChannelNumber: 100, Enabled: true,
+	})
+
+	req := httptest.NewRequest("GET", "/api/channels/chA", nil)
+	req.SetPathValue("iptvId", "chA")
+	w := httptest.NewRecorder()
+
+	server.handleLocalChannelGet(w, req)
+
+	var response ChannelResponse
+	json.NewDecoder(w.Body).Decode(&response)
+
+	if response.ChannelNumber != 0 {
+		t.Errorf("Disabled channel with taken number should return 0, got %d", response.ChannelNumber)
+	}
+}
+
+func TestHandleLocalChannelGetDisabledNumberFree(t *testing.T) {
+	server, _ := setupTestServer(t)
+
+	// Channel A is disabled on channel 100, but no one else has taken it
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "chA", Name: "Channel A", ChannelNumber: 100, Enabled: false,
+	})
+
+	req := httptest.NewRequest("GET", "/api/channels/chA", nil)
+	req.SetPathValue("iptvId", "chA")
+	w := httptest.NewRecorder()
+
+	server.handleLocalChannelGet(w, req)
+
+	var response ChannelResponse
+	json.NewDecoder(w.Body).Decode(&response)
+
+	if response.ChannelNumber != 100 {
+		t.Errorf("Disabled channel with free number should preserve it, got %d", response.ChannelNumber)
+	}
+}
+
 func TestHandleLocalChannelGetNotFound(t *testing.T) {
 	server, _ := setupTestServer(t)
 

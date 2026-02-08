@@ -118,6 +118,99 @@ http://stream.example.com/456
 	}
 }
 
+func TestUpdatePlaylistDisablesRemovedChannels(t *testing.T) {
+	// Initial M3U with 3 channels
+	initialM3U := `#EXTM3U
+#EXTINF:-1 tvg-name="ESPN",ESPN
+http://stream.example.com/123
+#EXTINF:-1 tvg-name="CNN",CNN
+http://stream.example.com/456
+#EXTINF:-1 tvg-name="BBC",BBC
+http://stream.example.com/789
+`
+	// Updated M3U with CNN removed
+	updatedM3U := `#EXTM3U
+#EXTINF:-1 tvg-name="ESPN",ESPN
+http://stream.example.com/123
+#EXTINF:-1 tvg-name="BBC",BBC
+http://stream.example.com/789
+`
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if callCount == 1 {
+			w.Write([]byte(initialM3U))
+		} else {
+			w.Write([]byte(updatedM3U))
+		}
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config.json")
+	channelsPath := filepath.Join(tmpDir, "channels.json")
+
+	cfg := config.Config{
+		PlaylistSources: []config.PlaylistSource{
+			{Name: "Test", URL: server.URL},
+		},
+	}
+	data, _ := json.Marshal(cfg)
+	os.WriteFile(cfgPath, data, 0644)
+
+	cfgManager, _ := config.NewManager(cfgPath)
+	channelStore, _ := channels.NewStore(channelsPath)
+	manager := NewManager(cfgManager, channelStore, tmpDir)
+
+	// First update - downloads initial M3U
+	if err := manager.UpdatePlaylist("Test"); err != nil {
+		t.Fatalf("First update failed: %v", err)
+	}
+
+	// Simulate saving channels locally (as the user would via the UI)
+	channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch123", Name: "ESPN", ChannelNumber: 100, Enabled: true, Playlist: "Test",
+	})
+	channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch456", Name: "CNN", ChannelNumber: 200, Enabled: true, Playlist: "Test",
+	})
+	channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch789", Name: "BBC", ChannelNumber: 300, Enabled: true, Playlist: "Test",
+	})
+
+	// Second update - CNN removed from M3U
+	if err := manager.UpdatePlaylist("Test"); err != nil {
+		t.Fatalf("Second update failed: %v", err)
+	}
+
+	// CNN (ch456) should now be disabled in the local store
+	cnn, ok := channelStore.GetChannel("ch456")
+	if !ok {
+		t.Fatal("CNN channel should still exist in store")
+	}
+	if cnn.Enabled {
+		t.Error("CNN should be disabled after being removed from playlist")
+	}
+	if cnn.ChannelNumber != 200 {
+		t.Errorf("CNN channel number should be preserved, got %d", cnn.ChannelNumber)
+	}
+
+	// ESPN and BBC should still be enabled
+	espn, _ := channelStore.GetChannel("ch123")
+	if !espn.Enabled {
+		t.Error("ESPN should still be enabled")
+	}
+	bbc, _ := channelStore.GetChannel("ch789")
+	if !bbc.Enabled {
+		t.Error("BBC should still be enabled")
+	}
+
+	// Channel number 200 should now be free
+	if channelStore.IsChannelNumberTaken(200, "") {
+		t.Error("Channel 200 should be free after CNN was disabled")
+	}
+}
+
 func TestUpdatePlaylistNotFound(t *testing.T) {
 	manager, _ := setupTestManager(t)
 

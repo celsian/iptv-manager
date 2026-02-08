@@ -92,36 +92,46 @@ func SendTestMessage(webhookURL string) error {
 	return sendWebhook(webhookURL, msg)
 }
 
-// SendRemovedChannelsNotification sends a notification about channels removed from a playlist
-func SendRemovedChannelsNotification(webhookURL string, playlist string, removedChannels []RemovedChannel) error {
+// SendRemovedChannelsNotification sends a single notification about channels
+// removed from one or more playlists. Each playlist gets its own field in the embed.
+func SendRemovedChannelsNotification(webhookURL string, removedByPlaylist map[string][]RemovedChannel) error {
 	if webhookURL == "" {
 		return nil // Silently skip if no webhook configured
 	}
 
-	if len(removedChannels) == 0 {
+	if len(removedByPlaylist) == 0 {
 		return nil
 	}
 
-	var channelList strings.Builder
-	for _, ch := range removedChannels {
-		if ch.ChannelNumber > 0 {
-			channelList.WriteString(fmt.Sprintf("**%d** - %s\n", ch.ChannelNumber, ch.Name))
-		} else {
-			channelList.WriteString(fmt.Sprintf("**--** - %s\n", ch.Name))
+	var fields []Field
+	for playlist, channels := range removedByPlaylist {
+		if len(channels) == 0 {
+			continue
 		}
+		var channelList strings.Builder
+		for _, ch := range channels {
+			if ch.ChannelNumber > 0 {
+				channelList.WriteString(fmt.Sprintf("**%d** - %s\n", ch.ChannelNumber, ch.Name))
+			} else {
+				channelList.WriteString(fmt.Sprintf("**--** - %s\n", ch.Name))
+			}
+		}
+		fields = append(fields, Field{
+			Name:  playlist + ":",
+			Value: channelList.String(),
+		})
+	}
+
+	if len(fields) == 0 {
+		return nil
 	}
 
 	msg := WebhookMessage{
 		Embeds: []Embed{
 			{
-				Title: "Channels Removed from Playlist",
-				Color: 0xFF0000, // Red
-				Fields: []Field{
-					{
-						Name:  playlist + ":",
-						Value: channelList.String(),
-					},
-				},
+				Title:     "Channels Removed from Playlist",
+				Color:     0xFF0000, // Red
+				Fields:    fields,
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 				Footer: &Footer{
 					Text: "IPTV Manager",

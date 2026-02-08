@@ -77,7 +77,15 @@ func (s *Server) handleLocalChannelGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, channelToResponse(ch))
+	resp := channelToResponse(ch)
+	// If the channel is disabled and its number is taken by another channel, clear it
+	if !ch.Enabled && ch.ChannelNumber > 0 {
+		if s.channelStore.IsChannelNumberTaken(ch.ChannelNumber, ch.IPTVId) {
+			resp.ChannelNumber = 0
+		}
+	}
+
+	respondJSON(w, resp)
 }
 
 // handleLocalChannelSave creates or updates a channel
