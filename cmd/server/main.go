@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Initialize playlist manager
-	playlistManager := playlists.NewManager(cfgManager, dataDir)
+	playlistManager := playlists.NewManager(cfgManager, channelStore, dataDir)
 	playlistManager.StartScheduler()
 
 	// Create and start server
