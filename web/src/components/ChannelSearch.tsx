@@ -5,11 +5,21 @@ import { ChannelCard } from './ChannelCard';
 import { StreamPreview } from './StreamPreview';
 import { ChannelConfigModal } from './ChannelConfigModal';
 
-export function ChannelSearch() {
+interface ChannelSearchProps {
+  initialPlaylist?: string;
+  onPlaylistChange?: (playlist: string) => void;
+}
+
+export function ChannelSearch({ initialPlaylist, onPlaylistChange }: ChannelSearchProps) {
   const [playlistSources, setPlaylistSources] = useState<PlaylistSource[]>([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState('');
+  const [selectedPlaylist, _setSelectedPlaylist] = useState(initialPlaylist || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
+
+  const setSelectedPlaylist = (playlist: string) => {
+    _setSelectedPlaylist(playlist);
+    onPlaylistChange?.(playlist);
+  };
   const [channels, setChannels] = useState<IPTVChannel[]>([]);
   const [savedChannels, setSavedChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);

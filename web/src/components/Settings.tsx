@@ -4,8 +4,18 @@ import { api, type Settings as SettingsType, type PlaylistSource } from '../lib/
 
 type SettingsTab = 'general' | 'playlists' | 'notifications';
 
-export function Settings() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+interface SettingsProps {
+  initialTab?: SettingsTab;
+  onTabChange?: (tab: SettingsTab) => void;
+}
+
+export function Settings({ initialTab, onTabChange }: SettingsProps) {
+  const [activeTab, _setActiveTab] = useState<SettingsTab>(initialTab || 'general');
+
+  const setActiveTab = (tab: SettingsTab) => {
+    _setActiveTab(tab);
+    onTabChange?.(tab);
+  };
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

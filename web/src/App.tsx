@@ -4,52 +4,80 @@ import { ChannelSearch } from './components/ChannelSearch';
 import { EnabledChannels } from './components/EnabledChannels';
 import { Settings } from './components/Settings';
 
-type Tab = 'search' | 'enabled' | 'settings';
+type Tab = 'search' | 'configure' | 'settings';
 
-const pathToTab: Record<string, Tab> = {
-  '/': 'search',
-  '/search': 'search',
-  '/enabled': 'enabled',
-  '/settings': 'settings',
-};
+interface Route {
+  tab: Tab;
+  subPath?: string;
+}
 
-const tabToPath: Record<Tab, string> = {
-  search: '/search',
-  enabled: '/enabled',
-  settings: '/settings',
-};
+function parseRoute(pathname: string): Route {
+  const path = pathname.replace(/\/$/, '') || '/';
+  
+  if (path === '/' || path === '/search') {
+    return { tab: 'search' };
+  }
+  if (path.startsWith('/search/')) {
+    return { tab: 'search', subPath: decodeURIComponent(path.slice('/search/'.length)) };
+  }
+  if (path === '/configure') {
+    return { tab: 'configure' };
+  }
+  if (path.startsWith('/configure/')) {
+    return { tab: 'configure', subPath: decodeURIComponent(path.slice('/configure/'.length)) };
+  }
+  if (path === '/settings') {
+    return { tab: 'settings', subPath: 'general' };
+  }
+  if (path.startsWith('/settings/')) {
+    return { tab: 'settings', subPath: path.slice('/settings/'.length) };
+  }
+  // Legacy route support
+  if (path === '/enabled') {
+    return { tab: 'configure' };
+  }
+  
+  return { tab: 'search' };
+}
 
-function getTabFromPath(): Tab {
-  const path = window.location.pathname;
-  return pathToTab[path] || 'search';
+function buildPath(tab: Tab, subPath?: string): string {
+  if (tab === 'search') {
+    return subPath ? `/search/${encodeURIComponent(subPath)}` : '/search';
+  }
+  if (tab === 'configure') {
+    return subPath ? `/configure/${encodeURIComponent(subPath)}` : '/configure';
+  }
+  if (tab === 'settings') {
+    return subPath ? `/settings/${subPath}` : '/settings/general';
+  }
+  return '/';
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(getTabFromPath);
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.pathname));
 
   useEffect(() => {
     const handlePopState = () => {
-      setActiveTab(getTabFromPath());
+      setRoute(parseRoute(window.location.pathname));
     };
-
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigateToTab = (tab: Tab) => {
-    setActiveTab(tab);
-    window.history.pushState({}, '', tabToPath[tab]);
+  const navigate = (tab: Tab, subPath?: string) => {
+    const newRoute: Route = { tab, subPath };
+    setRoute(newRoute);
+    window.history.pushState({}, '', buildPath(tab, subPath));
   };
 
   const tabs = [
     { id: 'search' as const, label: 'Search Channels', icon: Search },
-    { id: 'enabled' as const, label: 'Configure Channels', icon: List },
+    { id: 'configure' as const, label: 'Configure Channels', icon: List },
     { id: 'settings' as const, label: 'Settings', icon: SettingsIcon },
   ];
 
   return (
     <div className="min-h-screen bg-slate-900">
-      {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -61,16 +89,15 @@ function App() {
         </div>
       </header>
 
-      {/* Navigation */}
       <nav className="bg-slate-800/50 border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1">
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => navigateToTab(tab.id)}
+                onClick={() => navigate(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeTab === tab.id
+                  route.tab === tab.id
                     ? 'text-blue-400 border-blue-400'
                     : 'text-slate-400 border-transparent hover:text-slate-300 hover:border-slate-600'
                 }`}
@@ -83,11 +110,25 @@ function App() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'search' && <ChannelSearch />}
-        {activeTab === 'enabled' && <EnabledChannels />}
-        {activeTab === 'settings' && <Settings />}
+        {route.tab === 'search' && (
+          <ChannelSearch
+            initialPlaylist={route.subPath}
+            onPlaylistChange={(playlist) => navigate('search', playlist)}
+          />
+        )}
+        {route.tab === 'configure' && (
+          <EnabledChannels
+            initialPlaylist={route.subPath}
+            onPlaylistChange={(playlist) => navigate('configure', playlist)}
+          />
+        )}
+        {route.tab === 'settings' && (
+          <Settings
+            initialTab={route.subPath as 'general' | 'playlists' | 'notifications'}
+            onTabChange={(tab) => navigate('settings', tab)}
+          />
+        )}
       </main>
     </div>
   );

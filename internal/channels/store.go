@@ -416,6 +416,20 @@ func (s *Store) ShiftChannelsFromAndSave(channelNumber int, excludeIPTVId string
 	return shifted, nil
 }
 
+func (s *Store) RenamePlaylist(oldName, newName string) error {
+	s.mu.Lock()
+	for _, ch := range s.channels {
+		if ch.Playlist == oldName {
+			ch.Playlist = newName
+		}
+		if ch.GroupTitle == oldName {
+			ch.GroupTitle = newName
+		}
+	}
+	s.mu.Unlock()
+	return s.Save()
+}
+
 // ExtractNumericID extracts numeric ID from IPTV channel ID (e.g., "ch12345" -> "12345")
 func ExtractNumericID(iptvId string) string {
 	return strings.TrimPrefix(iptvId, "ch")
