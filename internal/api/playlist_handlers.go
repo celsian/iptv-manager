@@ -7,6 +7,18 @@ import (
 	"strings"
 )
 
+type PlaylistChannelResponse struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	CustomName    string `json:"customName,omitempty"`
+	ChannelNumber int    `json:"channelNumber,omitempty"`
+	GroupTitle    string `json:"groupTitle"`
+	Logo          string `json:"logo,omitempty"`
+	URL           string `json:"url"`
+	Playlist      string `json:"playlist"`
+	HasCustom     bool   `json:"hasCustom"`
+}
+
 // handleGetPlaylistSources returns all playlist source configurations
 func (s *Server) handleGetPlaylistSources(w http.ResponseWriter, r *http.Request) {
 	sources := s.cfg.GetAllPlaylistSources()
@@ -133,19 +145,7 @@ func (s *Server) handleGetPlaylistChannels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	type ChannelResponse struct {
-		ID            string `json:"id"`
-		Name          string `json:"name"`
-		CustomName    string `json:"customName,omitempty"`
-		ChannelNumber int    `json:"channelNumber,omitempty"`
-		GroupTitle    string `json:"groupTitle"`
-		Logo          string `json:"logo,omitempty"`
-		URL           string `json:"url"`
-		Playlist      string `json:"playlist"`
-		HasCustom     bool   `json:"hasCustom"`
-	}
-
-	response := make([]ChannelResponse, 0, len(playlistChannels))
+	response := make([]PlaylistChannelResponse, 0, len(playlistChannels))
 
 	for _, pch := range playlistChannels {
 		// Extract channel ID from URL (last segment) for IPTV service compatibility
@@ -160,7 +160,7 @@ func (s *Server) handleGetPlaylistChannels(w http.ResponseWriter, r *http.Reques
 			channelID = pch.ID // Fallback to tvg-id if URL parsing fails
 		}
 
-		ch := ChannelResponse{
+		ch := PlaylistChannelResponse{
 			ID:         channelID,
 			Name:       pch.Name,
 			GroupTitle: playlist, // Use playlist name as default group title

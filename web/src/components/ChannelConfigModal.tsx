@@ -29,6 +29,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
 
   useEffect(() => {
     loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
       setNearbyChannels([]);
       setConflictWarning(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelNumber]);
 
   const loadInitialData = async () => {
@@ -67,7 +69,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
         setChannelName(''); // Empty, use placeholder
         setGroupTitle(playlist);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load channel data');
     } finally {
       setLoading(false);

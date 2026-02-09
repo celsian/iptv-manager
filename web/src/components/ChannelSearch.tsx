@@ -180,7 +180,7 @@ export function ChannelSearch({ initialPlaylist, onPlaylistChange }: ChannelSear
       name: group,
       channels: groups[group],
     }));
-  }, [channels, groupByCategory]);
+  }, [filteredChannels, groupByCategory]);
 
   // Show playlist selection if none selected
   if (!selectedPlaylist) {

@@ -83,17 +83,20 @@ func (s *Store) Load() error {
 	return nil
 }
 
-func (s *Store) Save() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+// saveLocked writes channels to disk. Caller must hold the lock.
+func (s *Store) saveLocked() error {
 	sd := storeData{Channels: s.channels}
 	data, err := json.MarshalIndent(sd, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(s.filePath, data, 0644)
+}
+
+func (s *Store) Save() error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.saveLocked()
 }
 
 func (s *Store) GetChannel(iptvId string) (*Channel, bool) {
@@ -106,18 +109,16 @@ func (s *Store) GetChannel(iptvId string) (*Channel, bool) {
 
 func (s *Store) SetChannel(ch *Channel) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.channels[ch.IPTVId] = ch
-	s.mu.Unlock()
-
-	return s.Save()
+	return s.saveLocked()
 }
 
 func (s *Store) DeleteChannel(iptvId string) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.channels, iptvId)
-	s.mu.Unlock()
-
-	return s.Save()
+	return s.saveLocked()
 }
 
 func (s *Store) GetAllChannels() []*Channel {
@@ -128,25 +129,17 @@ func (s *Store) GetAllChannels() []*Channel {
 	for _, ch := range s.channels {
 		channels = append(channels, ch)
 	}
-
-	// Sort by channel number
-	sort.Slice(channels, func(i, j int) bool {
-		return channels[i].ChannelNumber < channels[j].ChannelNumber
-	})
-
+	SortByChannelNumber(channels)
 	return channels
 }
 
-// GetStreamBaseURL extracts the base URL (without channel ID) from any saved channel
-// Returns empty string if no channels have URLs
+// GetStreamBaseURL extracts the base URL (without channel ID) from any saved channel.
 func (s *Store) GetStreamBaseURL() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	for _, ch := range s.channels {
 		if ch.URL != "" {
-			// URL format: https://host/uid/pass/channelId
-			// Remove the last segment (channel ID) to get base URL
 			lastSlash := strings.LastIndex(ch.URL, "/")
 			if lastSlash > 0 {
 				return ch.URL[:lastSlash]
@@ -166,11 +159,7 @@ func (s *Store) GetEnabledChannels() []*Channel {
 			channels = append(channels, ch)
 		}
 	}
-
-	sort.Slice(channels, func(i, j int) bool {
-		return channels[i].ChannelNumber < channels[j].ChannelNumber
-	})
-
+	SortByChannelNumber(channels)
 	return channels
 }
 
@@ -184,11 +173,7 @@ func (s *Store) GetChannelsByPlaylist(playlist string) []*Channel {
 			channels = append(channels, ch)
 		}
 	}
-
-	sort.Slice(channels, func(i, j int) bool {
-		return channels[i].ChannelNumber < channels[j].ChannelNumber
-	})
-
+	SortByChannelNumber(channels)
 	return channels
 }
 
@@ -196,7 +181,6 @@ func (s *Store) GetChannelsByGroupTitle(groupTitles []string) []*Channel {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Create a map for faster lookup
 	groupMap := make(map[string]bool)
 	for _, g := range groupTitles {
 		groupMap[strings.ToLower(strings.TrimSpace(g))] = true
@@ -208,11 +192,7 @@ func (s *Store) GetChannelsByGroupTitle(groupTitles []string) []*Channel {
 			channels = append(channels, ch)
 		}
 	}
-
-	sort.Slice(channels, func(i, j int) bool {
-		return channels[i].ChannelNumber < channels[j].ChannelNumber
-	})
-
+	SortByChannelNumber(channels)
 	return channels
 }
 
@@ -220,24 +200,18 @@ func (s *Store) GetNearbyChannels(targetNumber int, count int) []*Channel {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Get all enabled channels sorted by number
 	var sorted []*Channel
 	for _, ch := range s.channels {
 		if ch.Enabled && ch.ChannelNumber > 0 {
 			sorted = append(sorted, ch)
 		}
 	}
+	SortByChannelNumber(sorted)
 
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ChannelNumber < sorted[j].ChannelNumber
-	})
-
-	// Find insertion point
 	insertIdx := sort.Search(len(sorted), func(i int) bool {
 		return sorted[i].ChannelNumber >= targetNumber
 	})
 
-	// Get count/2 below and count/2 above
 	belowCount := count / 2
 	aboveCount := count / 2
 
@@ -251,7 +225,6 @@ func (s *Store) GetNearbyChannels(targetNumber int, count int) []*Channel {
 		endIdx = len(sorted)
 	}
 
-	// Adjust to get up to 'count' total
 	if insertIdx-startIdx < belowCount && endIdx < len(sorted) {
 		extra := belowCount - (insertIdx - startIdx)
 		endIdx = min(endIdx+extra, len(sorted))
@@ -284,15 +257,12 @@ func (s *Store) GetNextAvailableChannelNumberForPlaylist(playlist string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Collect all used channel numbers
 	usedNumbers := make(map[int]bool)
 	lowestInPlaylist := 0
 
 	for _, ch := range s.channels {
 		if ch.ChannelNumber > 0 && ch.Enabled {
 			usedNumbers[ch.ChannelNumber] = true
-
-			// Track the lowest channel number in the specified playlist
 			if playlist != "" && ch.Playlist == playlist {
 				if lowestInPlaylist == 0 || ch.ChannelNumber < lowestInPlaylist {
 					lowestInPlaylist = ch.ChannelNumber
@@ -301,13 +271,11 @@ func (s *Store) GetNextAvailableChannelNumberForPlaylist(playlist string) int {
 		}
 	}
 
-	// Start from the lowest channel in the playlist, or 1 if none set
 	startFrom := 1
 	if lowestInPlaylist > 0 {
 		startFrom = lowestInPlaylist
 	}
 
-	// Find the first gap starting from startFrom
 	for i := startFrom; ; i++ {
 		if !usedNumbers[i] {
 			return i
@@ -331,26 +299,21 @@ func (s *Store) GetGroupTitles() []string {
 		groups = append(groups, g)
 	}
 	sort.Strings(groups)
-
 	return groups
 }
 
-// CountChannelsToShift counts how many channels would be shifted if inserting at channelNumber
 func (s *Store) CountChannelsToShift(channelNumber int, excludeIPTVId string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Collect channel numbers, excluding the one being assigned
 	var numbers []int
 	for _, ch := range s.channels {
 		if ch.Enabled && ch.ChannelNumber > 0 && ch.IPTVId != excludeIPTVId {
 			numbers = append(numbers, ch.ChannelNumber)
 		}
 	}
-
 	sort.Ints(numbers)
 
-	// Count consecutive channels starting from channelNumber
 	count := 0
 	currentNum := channelNumber
 	for _, num := range numbers {
@@ -361,19 +324,16 @@ func (s *Store) CountChannelsToShift(channelNumber int, excludeIPTVId string) in
 			break
 		}
 	}
-
 	return count
 }
 
-// ShiftChannelsFrom shifts all channels at or after the given number up by 1
-// to make room for a new channel. It only shifts consecutive channels.
-// excludeIPTVId is the channel being assigned the number (won't be shifted).
+// ShiftChannelsFrom shifts consecutive channels at the given number up by 1.
+// excludeIPTVId is the channel being assigned the number.
 // Returns the list of shifted channel IDs.
 func (s *Store) ShiftChannelsFrom(channelNumber int, excludeIPTVId string) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Collect all enabled channels with their numbers, excluding the one being assigned
 	type channelNum struct {
 		ch  *Channel
 		num int
@@ -385,33 +345,28 @@ func (s *Store) ShiftChannelsFrom(channelNumber int, excludeIPTVId string) []str
 		}
 	}
 
-	// Sort by channel number
 	sort.Slice(numbered, func(i, j int) bool {
 		return numbered[i].num < numbered[j].num
 	})
 
-	// Find channels that need shifting (consecutive from channelNumber)
 	shifted := []string{}
 	currentNum := channelNumber
 	for _, cn := range numbered {
 		if cn.num == currentNum {
-			// This channel needs to shift
 			cn.ch.ChannelNumber = cn.num + 1
 			shifted = append(shifted, cn.ch.IPTVId)
 			currentNum = cn.num + 1
 		} else if cn.num > currentNum {
-			// Gap found, stop shifting
 			break
 		}
 	}
-
 	return shifted
 }
 
-// ShiftChannelsFromAndSave shifts channels and saves to disk
 func (s *Store) ShiftChannelsFromAndSave(channelNumber int, excludeIPTVId string) ([]string, error) {
 	shifted := s.ShiftChannelsFrom(channelNumber, excludeIPTVId)
 	if len(shifted) > 0 {
+		// ShiftChannelsFrom already released the lock, so use Save()
 		if err := s.Save(); err != nil {
 			return shifted, err
 		}
@@ -421,6 +376,8 @@ func (s *Store) ShiftChannelsFromAndSave(channelNumber int, excludeIPTVId string
 
 func (s *Store) RenamePlaylist(oldName, newName string) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, ch := range s.channels {
 		if ch.Playlist == oldName {
 			ch.Playlist = newName
@@ -429,14 +386,13 @@ func (s *Store) RenamePlaylist(oldName, newName string) error {
 			ch.GroupTitle = newName
 		}
 	}
-	s.mu.Unlock()
-	return s.Save()
+	return s.saveLocked()
 }
 
-// CleanupStaleChannels removes disabled channels that have been disabled longer than the retention period.
-// Returns the number of channels removed.
+// CleanupStaleChannels removes disabled channels older than the retention period.
 func (s *Store) CleanupStaleChannels(retentionDays int) (int, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	var toDelete []string
@@ -458,10 +414,8 @@ func (s *Store) CleanupStaleChannels(retentionDays int) (int, error) {
 		delete(s.channels, id)
 	}
 
-	s.mu.Unlock()
-
 	if len(toDelete) > 0 {
-		if err := s.Save(); err != nil {
+		if err := s.saveLocked(); err != nil {
 			return len(toDelete), err
 		}
 	}
@@ -469,12 +423,30 @@ func (s *Store) CleanupStaleChannels(retentionDays int) (int, error) {
 	return len(toDelete), nil
 }
 
-// ExtractNumericID extracts numeric ID from IPTV channel ID (e.g., "ch12345" -> "12345")
+// SetChannelBatch updates multiple channels and saves once.
+func (s *Store) SetChannelBatch(channels []*Channel) error {
+	if len(channels) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, ch := range channels {
+		s.channels[ch.IPTVId] = ch
+	}
+	return s.saveLocked()
+}
+
+// SortByChannelNumber sorts channels by channel number ascending.
+func SortByChannelNumber(channels []*Channel) {
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].ChannelNumber < channels[j].ChannelNumber
+	})
+}
+
 func ExtractNumericID(iptvId string) string {
 	return strings.TrimPrefix(iptvId, "ch")
 }
 
-// ParseChannelNumber converts string to int, returns 0 if invalid
 func ParseChannelNumber(s string) int {
 	n, _ := strconv.Atoi(s)
 	return n

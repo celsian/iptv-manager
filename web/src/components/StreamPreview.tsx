@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mpegts from 'mpegts.js';
 import { X, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { copyToClipboard } from '../lib/clipboard';
 
 interface StreamPreviewProps {
   channelId: string;
@@ -170,6 +171,7 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
         playerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   const displayDimensions = getDisplayDimensions();
@@ -178,16 +180,7 @@ export function StreamPreview({ channelId, channelName, onClose }: StreamPreview
 
   const copyUrl = () => {
     if (streamUrl) {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(streamUrl);
-      } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = streamUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
+      copyToClipboard(streamUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

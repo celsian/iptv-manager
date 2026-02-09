@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/celsian/iptv-manager/internal/config"
 	"github.com/celsian/iptv-manager/internal/discord"
@@ -63,70 +64,57 @@ func (s *Server) handleGetPlaylists(w http.ResponseWriter, r *http.Request) {
 
 // Preview handlers
 
+// resolveStreamURL looks up a stream URL for a channel ID using multiple strategies:
+// local store, cached playlists, and base URL fallback.
+func (s *Server) resolveStreamURL(channelID string) string {
+	normalized := normalizeChannelID(channelID)
+
+	if ch, ok := s.channelStore.GetChannel(normalized); ok && ch.URL != "" {
+		return ch.URL
+	}
+
+	if url, err := s.playlistManager.GetChannelURLFromAnyPlaylist(normalized); err == nil {
+		return url
+	}
+
+	// Fallback: construct URL from base URL of an existing channel
+	numericID := strings.TrimPrefix(normalized, "ch")
+	if baseURL := s.channelStore.GetStreamBaseURL(); baseURL != "" {
+		return baseURL + "/" + numericID
+	}
+
+	return ""
+}
+
+// normalizeChannelID ensures the ID has the "ch" prefix for local store lookups.
+func normalizeChannelID(id string) string {
+	if strings.HasPrefix(id, "ch") {
+		return id
+	}
+	return "ch" + id
+}
+
 func (s *Server) handlePreviewURL(w http.ResponseWriter, r *http.Request) {
 	channelID := r.PathValue("channelId")
 
-	// First try to get URL from local store
-	if ch, ok := s.channelStore.GetChannel(channelID); ok && ch.URL != "" {
-		respondJSON(w, map[string]string{"url": ch.URL})
+	url := s.resolveStreamURL(channelID)
+	if url == "" {
+		http.Error(w, "Unable to determine stream URL", http.StatusInternalServerError)
 		return
 	}
 
-	// Try to find URL from cached playlists
-	if url, err := s.playlistManager.GetChannelURLFromAnyPlaylist(channelID); err == nil {
-		respondJSON(w, map[string]string{"url": url})
-		return
-	}
-
-	// Fallback: construct URL using base URL from an existing saved channel
-	// Extract numeric ID (remove "ch" prefix if present)
-	numericID := channelID
-	if len(channelID) > 2 && channelID[:2] == "ch" {
-		numericID = channelID[2:]
-	}
-
-	// Get base URL pattern from any saved channel
-	if baseURL := s.channelStore.GetStreamBaseURL(); baseURL != "" {
-		url := baseURL + "/" + numericID
-		respondJSON(w, map[string]string{"url": url})
-		return
-	}
-
-	http.Error(w, "Unable to determine stream URL", http.StatusInternalServerError)
+	respondJSON(w, map[string]string{"url": url})
 }
 
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	channelID := r.PathValue("channelId")
 
-	var streamURL string
-
-	// First try to get URL from local store
-	if ch, ok := s.channelStore.GetChannel(channelID); ok && ch.URL != "" {
-		streamURL = ch.URL
-	} else {
-		// Try to find URL from cached playlists
-		if url, err := s.playlistManager.GetChannelURLFromAnyPlaylist(channelID); err == nil {
-			streamURL = url
-		}
-	}
-
-	// Fallback: construct URL using base URL from an existing saved channel
-	if streamURL == "" {
-		numericID := channelID
-		if len(channelID) > 2 && channelID[:2] == "ch" {
-			numericID = channelID[2:]
-		}
-		if baseURL := s.channelStore.GetStreamBaseURL(); baseURL != "" {
-			streamURL = baseURL + "/" + numericID
-		}
-	}
-
+	streamURL := s.resolveStreamURL(channelID)
 	if streamURL == "" {
 		http.Error(w, "Unable to determine stream URL", http.StatusInternalServerError)
 		return
 	}
 
-	// Proxy the stream
 	req, err := http.NewRequest("GET", streamURL, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -312,19 +300,4 @@ func maskString(s string) string {
 		return "****"
 	}
 	return s[:2] + "****" + s[len(s)-2:]
-}
-
-// Helper to build stream URL for a channel
-func (s *Server) getStreamURL(iptvId string) string {
-	// Check local store first
-	if ch, ok := s.channelStore.GetChannel(iptvId); ok && ch.URL != "" {
-		return ch.URL
-	}
-
-	// Try to find from cached playlists
-	if url, err := s.playlistManager.GetChannelURLFromAnyPlaylist(iptvId); err == nil {
-		return url
-	}
-
-	return ""
 }

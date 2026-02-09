@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, RefreshCw, Play, Settings2, Tv, PowerOff, Copy, Check } from 'lucide-react';
 import { api, type PlaylistChannel, type IPTVChannel, type PlaylistSource } from '../lib/api';
+import { copyToClipboard } from '../lib/clipboard';
 import { StreamPreview } from './StreamPreview';
 import { ChannelConfigModal, type SavedChannelData } from './ChannelConfigModal';
 
@@ -59,6 +60,7 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
         loadPlaylistChannels();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlaylist]);
 
   // Get the IPTV playlist name for the selected playlist
@@ -242,16 +244,7 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
               const url = selectedPlaylist === '__all__'
                 ? `${window.location.origin}/m3u/iptv-manager.m3u`
                 : `${window.location.origin}/m3u/iptv-manager.m3u?group-title=${encodeURIComponent(selectedPlaylist)}`;
-              if (navigator.clipboard) {
-                navigator.clipboard.writeText(url);
-              } else {
-                const textArea = document.createElement('textarea');
-                textArea.value = url;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-              }
+              copyToClipboard(url);
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
             }}
