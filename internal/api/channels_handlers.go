@@ -10,7 +10,6 @@ import (
 	"github.com/celsian/iptv-manager/internal/channels"
 )
 
-// Channel response for API
 type ChannelResponse struct {
 	IPTVId        string `json:"iptvId"`
 	Name          string `json:"name"`
@@ -21,6 +20,13 @@ type ChannelResponse struct {
 	URL           string `json:"url"`
 	Enabled       bool   `json:"enabled"`
 	Playlist      string `json:"playlist"`
+}
+
+type NearbyChannelResponse struct {
+	ChannelNumber int    `json:"channelNumber"`
+	Name          string `json:"name"`
+	CustomName    string `json:"customName"`
+	IPTVId        string `json:"iptvId"`
 }
 
 func channelToResponse(ch *channels.Channel) ChannelResponse {
@@ -68,17 +74,9 @@ func (s *Server) handleLocalEnabled(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, response)
 }
 
-// normalizeIPTVId ensures the ID has the "ch" prefix
-func normalizeIPTVId(id string) string {
-	if strings.HasPrefix(id, "ch") {
-		return id
-	}
-	return "ch" + id
-}
-
 // handleLocalChannel gets or updates a single channel
 func (s *Server) handleLocalChannelGet(w http.ResponseWriter, r *http.Request) {
-	iptvId := normalizeIPTVId(r.PathValue("iptvId"))
+	iptvId := normalizeChannelID(r.PathValue("iptvId"))
 
 	ch, ok := s.channelStore.GetChannel(iptvId)
 	if !ok {
@@ -117,7 +115,7 @@ func (s *Server) handleLocalChannelSave(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Normalize the IPTV ID
-	normalizedId := normalizeIPTVId(req.IPTVId)
+	normalizedId := normalizeChannelID(req.IPTVId)
 
 	// If channel number is taken, shift existing channels to make room
 	var shiftedChannels []string
@@ -142,7 +140,7 @@ func (s *Server) handleLocalChannelSave(w http.ResponseWriter, r *http.Request) 
 		URL:           req.URL,
 		Enabled:       req.Enabled,
 		Playlist:      req.Playlist,
-		DisabledAt:    "", // Clear disabled timestamp when saving
+		DisabledAt:    "",
 	}
 
 	if err := s.channelStore.SetChannel(ch); err != nil {
@@ -168,8 +166,7 @@ func (s *Server) handleLocalChannelDisable(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get the channel (normalize ID)
-	normalizedId := normalizeIPTVId(req.IPTVId)
+	normalizedId := normalizeChannelID(req.IPTVId)
 	ch, ok := s.channelStore.GetChannel(normalizedId)
 	if !ok {
 		http.Error(w, "Channel not found", http.StatusNotFound)
@@ -207,20 +204,13 @@ func (s *Server) handleLocalNearby(w http.ResponseWriter, r *http.Request) {
 
 	chans := s.channelStore.GetNearbyChannels(channel, count)
 
-	type NearbyResponse struct {
-		ChannelNumber int    `json:"channelNumber"`
-		Name          string `json:"name"`
-		CustomName    string `json:"customName"`
-		IPTVId        string `json:"iptvId"`
-	}
-
-	response := make([]NearbyResponse, 0, len(chans))
+	response := make([]NearbyChannelResponse, 0, len(chans))
 	for _, ch := range chans {
 		displayName := ch.CustomName
 		if displayName == "" {
 			displayName = ch.Name
 		}
-		response = append(response, NearbyResponse{
+		response = append(response, NearbyChannelResponse{
 			ChannelNumber: ch.ChannelNumber,
 			Name:          displayName,
 			CustomName:    ch.CustomName,
@@ -267,7 +257,7 @@ func (s *Server) handleNextChannelNumber(w http.ResponseWriter, r *http.Request)
 // handleCheckChannelConflict checks if a channel number would cause conflicts
 func (s *Server) handleCheckChannelConflict(w http.ResponseWriter, r *http.Request) {
 	channelNumStr := r.URL.Query().Get("channelNumber")
-	excludeId := normalizeIPTVId(r.URL.Query().Get("excludeId"))
+	excludeId := normalizeChannelID(r.URL.Query().Get("excludeId"))
 
 	channelNum, err := strconv.Atoi(channelNumStr)
 	if err != nil || channelNum <= 0 {

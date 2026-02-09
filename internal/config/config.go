@@ -22,7 +22,7 @@ type EmbyConfig struct {
 type PlaylistSource struct {
 	Name         string `json:"name"`
 	URL          string `json:"url"`
-	IPTVPlaylist string `json:"iptvPlaylist,omitempty"` // The playlist name on the IPTV service (for toggling channels)
+	IPTVPlaylist string `json:"iptvPlaylist,omitempty"`
 	UpdatedAt    string `json:"updatedAt,omitempty"`
 }
 
@@ -83,16 +83,19 @@ func (m *Manager) Load() error {
 	return nil
 }
 
-func (m *Manager) Save() error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
+// saveLocked writes config to disk. Caller must hold the lock.
+func (m *Manager) saveLocked() error {
 	data, err := json.MarshalIndent(m.config, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(m.filePath, data, 0644)
+}
+
+func (m *Manager) Save() error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.saveLocked()
 }
 
 func (m *Manager) Get() Config {
@@ -103,10 +106,9 @@ func (m *Manager) Get() Config {
 
 func (m *Manager) Update(cfg Config) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.config = &cfg
-	m.mu.Unlock()
-
-	return m.Save()
+	return m.saveLocked()
 }
 
 func (m *Manager) GetPlaylistSource(name string) (PlaylistSource, bool) {
@@ -133,13 +135,13 @@ func (m *Manager) GetAllPlaylistSources() []PlaylistSource {
 
 func (m *Manager) SetPlaylistUpdatedAt(name string, timestamp string) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for i := range m.config.PlaylistSources {
 		if m.config.PlaylistSources[i].Name == name {
 			m.config.PlaylistSources[i].UpdatedAt = timestamp
 			break
 		}
 	}
-	m.mu.Unlock()
-
-	return m.Save()
+	return m.saveLocked()
 }
