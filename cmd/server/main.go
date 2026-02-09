@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/celsian/iptv-manager/internal/api"
 	"github.com/celsian/iptv-manager/internal/channels"
@@ -22,50 +26,66 @@ func main() {
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
 
-	// Determine data directory - defaults to "./data" for local development
 	dataDir := os.Getenv("DATA_DIR")
 	if dataDir == "" {
 		dataDir = "./data"
 	}
 
-	// Ensure data directory exists
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
-	// Config path
 	cfgPath := *configPath
 	if cfgPath == "" {
 		cfgPath = filepath.Join(dataDir, "config.json")
 	}
 
-	// Channels data path
 	channelsPath := filepath.Join(dataDir, "channels.json")
 
-	// Initialize config manager
 	cfgManager, err := config.NewManager(cfgPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
 
-	// Initialize channel store
 	channelStore, err := channels.NewStore(channelsPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize channel store: %v", err)
 	}
 
-	// Initialize playlist manager
 	playlistManager := playlists.NewManager(cfgManager, channelStore, dataDir)
 	playlistManager.StartScheduler()
 
-	// Create and start server
 	server := api.NewServer(cfgManager, channelStore, playlistManager, staticFS)
 
 	addr := ":" + *port
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: server.Router(),
+	}
+
 	log.Printf("Starting IPTV Manager on http://localhost%s", addr)
 	log.Printf("M3U playlist available at http://localhost%s/m3u/iptv-manager.m3u", addr)
 
-	if err := http.ListenAndServe(addr, server.Router()); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	// Graceful shutdown on SIGINT/SIGTERM
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	<-stop
+	log.Println("Shutting down...")
+
+	playlistManager.StopScheduler()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
 	}
+
+	log.Println("Server stopped")
 }

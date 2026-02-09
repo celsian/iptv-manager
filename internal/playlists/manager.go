@@ -193,6 +193,7 @@ func (m *Manager) updatePlaylistInternal(playlist string) ([]discord.RemovedChan
 	removedChannels := findRemovedChannels(existingChannels, newChannels)
 
 	var discordRemoved []discord.RemovedChannel
+	var toDisable []*channels.Channel
 
 	for _, ch := range removedChannels {
 		if m.channelStore != nil {
@@ -207,13 +208,16 @@ func (m *Manager) updatePlaylistInternal(playlist string) ([]discord.RemovedChan
 					})
 					storedCh.Enabled = false
 					storedCh.DisabledAt = time.Now().Format(time.RFC3339)
-					if err := m.channelStore.SetChannel(storedCh); err != nil {
-						log.Printf("Failed to disable removed channel %s: %v", channelID, err)
-					} else {
-						log.Printf("Disabled removed channel %s (%s) from playlist %s", channelID, ch.Name, playlist)
-					}
+					toDisable = append(toDisable, storedCh)
+					log.Printf("Disabled removed channel %s (%s) from playlist %s", channelID, ch.Name, playlist)
 				}
 			}
+		}
+	}
+
+	if len(toDisable) > 0 {
+		if err := m.channelStore.SetChannelBatch(toDisable); err != nil {
+			log.Printf("Failed to save disabled channels: %v", err)
 		}
 	}
 
@@ -261,6 +265,14 @@ func (m *Manager) GetPlaylistChannels(playlist string) []PlaylistChannel {
 	return channels
 }
 
+var (
+	reExtinf     = regexp.MustCompile(`#EXTINF:-?\d+\s*(.*)`)
+	reTvgID      = regexp.MustCompile(`tvg-id="([^"]*)"`)
+	reTvgName    = regexp.MustCompile(`tvg-name="([^"]*)"`)
+	reTvgLogo    = regexp.MustCompile(`tvg-logo="([^"]*)"`)
+	reGroupTitle = regexp.MustCompile(`group-title="([^"]*)"`)
+)
+
 func parseM3U(path string) []PlaylistChannel {
 	file, err := os.Open(path)
 	if err != nil {
@@ -272,27 +284,20 @@ func parseM3U(path string) []PlaylistChannel {
 	var currentChannel PlaylistChannel
 
 	scanner := bufio.NewScanner(file)
-	extinf := regexp.MustCompile(`#EXTINF:-?\d+\s*(.*)`)
-	tvgID := regexp.MustCompile(`tvg-id="([^"]*)"`)
-	tvgName := regexp.MustCompile(`tvg-name="([^"]*)"`)
-	tvgLogo := regexp.MustCompile(`tvg-logo="([^"]*)"`)
-	groupTitle := regexp.MustCompile(`group-title="([^"]*)"`)
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
 		if strings.HasPrefix(line, "#EXTINF:") {
-			matches := extinf.FindStringSubmatch(line)
+			matches := reExtinf.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				attrs := matches[1]
 
-				// Extract tvg-id
-				if idMatch := tvgID.FindStringSubmatch(attrs); len(idMatch) > 1 {
+				if idMatch := reTvgID.FindStringSubmatch(attrs); len(idMatch) > 1 {
 					currentChannel.ID = idMatch[1]
 				}
 
-				// Extract tvg-name or use the display name after the comma
-				if nameMatch := tvgName.FindStringSubmatch(attrs); len(nameMatch) > 1 {
+				if nameMatch := reTvgName.FindStringSubmatch(attrs); len(nameMatch) > 1 {
 					currentChannel.Name = nameMatch[1]
 				} else {
 					// Get name after the last comma
@@ -301,13 +306,11 @@ func parseM3U(path string) []PlaylistChannel {
 					}
 				}
 
-				// Extract tvg-logo
-				if logoMatch := tvgLogo.FindStringSubmatch(attrs); len(logoMatch) > 1 {
+				if logoMatch := reTvgLogo.FindStringSubmatch(attrs); len(logoMatch) > 1 {
 					currentChannel.Logo = logoMatch[1]
 				}
 
-				// Extract group-title (not used but parsed)
-				_ = groupTitle.FindStringSubmatch(attrs)
+				_ = reGroupTitle.FindStringSubmatch(attrs)
 			}
 		} else if !strings.HasPrefix(line, "#") && line != "" {
 			// This is the URL

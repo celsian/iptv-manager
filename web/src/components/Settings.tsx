@@ -62,7 +62,7 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
         playlistUpdateTime: data.playlistUpdateTime || '03:00',
         discordWebhook: data.discordWebhook || '',
       });
-    } catch (err) {
+    } catch {
       setError('Failed to load settings');
     } finally {
       setLoading(false);
