@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNewStore(t *testing.T) {
@@ -459,5 +460,71 @@ func TestStorePersistence(t *testing.T) {
 	}
 	if ch.ChannelNumber != 42 {
 		t.Errorf("ChannelNumber = %d, want 42", ch.ChannelNumber)
+	}
+}
+
+func TestCleanupStaleChannels(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, _ := NewStore(filepath.Join(tmpDir, "channels.json"))
+
+	now := time.Now()
+
+	// Channel disabled 40 days ago (should be cleaned up with 30 day retention)
+	store.SetChannel(&Channel{
+		IPTVId:     "ch1",
+		Name:       "Old Disabled",
+		Enabled:    false,
+		DisabledAt: now.AddDate(0, 0, -40).Format(time.RFC3339),
+	})
+
+	// Channel disabled 10 days ago (should be kept)
+	store.SetChannel(&Channel{
+		IPTVId:     "ch2",
+		Name:       "Recent Disabled",
+		Enabled:    false,
+		DisabledAt: now.AddDate(0, 0, -10).Format(time.RFC3339),
+	})
+
+	// Enabled channel (should be kept)
+	store.SetChannel(&Channel{
+		IPTVId:  "ch3",
+		Name:    "Enabled",
+		Enabled: true,
+	})
+
+	// Disabled channel without timestamp (should be kept - legacy)
+	store.SetChannel(&Channel{
+		IPTVId:  "ch4",
+		Name:    "Disabled No Timestamp",
+		Enabled: false,
+	})
+
+	count, err := store.CleanupStaleChannels(30)
+	if err != nil {
+		t.Fatalf("CleanupStaleChannels failed: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("CleanupStaleChannels removed %d channels, want 1", count)
+	}
+
+	// ch1 should be gone
+	if _, ok := store.GetChannel("ch1"); ok {
+		t.Error("ch1 should have been cleaned up")
+	}
+
+	// ch2 should still exist
+	if _, ok := store.GetChannel("ch2"); !ok {
+		t.Error("ch2 should still exist")
+	}
+
+	// ch3 should still exist
+	if _, ok := store.GetChannel("ch3"); !ok {
+		t.Error("ch3 should still exist")
+	}
+
+	// ch4 should still exist (no timestamp)
+	if _, ok := store.GetChannel("ch4"); !ok {
+		t.Error("ch4 should still exist")
 	}
 }

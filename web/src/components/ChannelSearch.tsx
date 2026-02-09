@@ -110,17 +110,41 @@ export function ChannelSearch({ initialPlaylist, onPlaylistChange }: ChannelSear
 
   const handleToggle = async (channel: IPTVChannel) => {
     setTogglingIds(prev => new Set(prev).add(channel.id));
+    const enabling = !channel.enabled;
 
     try {
       const iptvPlaylist = getIptvPlaylist(selectedPlaylist);
-      await api.iptv.toggle(iptvPlaylist, channel.id, !channel.enabled);
+      await api.iptv.toggle(iptvPlaylist, channel.id, enabling);
       
       // Mark playlist as dirty so it gets refreshed when viewing Configure Channels
       await api.playlists.markDirty(selectedPlaylist);
+
+      // If enabling, check if channel exists locally and re-enable it
+      if (enabling) {
+        try {
+          const existingChannel = await api.channels.get(channel.id);
+          if (existingChannel && !existingChannel.enabled) {
+            // Re-enable the existing local channel
+            await api.channels.save({
+              iptvId: existingChannel.iptvId,
+              name: existingChannel.name,
+              customName: existingChannel.customName,
+              channelNumber: existingChannel.channelNumber,
+              groupTitle: existingChannel.groupTitle,
+              logo: existingChannel.logo,
+              url: existingChannel.url,
+              enabled: true,
+              playlist: existingChannel.playlist,
+            });
+          }
+        } catch {
+          // Channel doesn't exist locally, that's fine
+        }
+      }
       
       setChannels(prev =>
         prev.map(ch =>
-          ch.id === channel.id ? { ...ch, enabled: !ch.enabled } : ch
+          ch.id === channel.id ? { ...ch, enabled: enabling } : ch
         )
       );
     } catch (err) {

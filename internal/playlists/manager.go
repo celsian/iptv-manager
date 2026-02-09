@@ -206,6 +206,7 @@ func (m *Manager) updatePlaylistInternal(playlist string) ([]discord.RemovedChan
 						Playlist:      playlist,
 					})
 					storedCh.Enabled = false
+					storedCh.DisabledAt = time.Now().Format(time.RFC3339)
 					if err := m.channelStore.SetChannel(storedCh); err != nil {
 						log.Printf("Failed to disable removed channel %s: %v", channelID, err)
 					} else {
@@ -425,6 +426,15 @@ func (m *Manager) updateAllPlaylists() {
 	if len(allRemoved) > 0 && cfg.DiscordWebhook != "" {
 		if err := discord.SendRemovedChannelsNotification(cfg.DiscordWebhook, allRemoved); err != nil {
 			log.Printf("Failed to send Discord notification: %v", err)
+		}
+	}
+
+	// Clean up stale disabled channels (30 day retention)
+	if m.channelStore != nil {
+		if count, err := m.channelStore.CleanupStaleChannels(30); err != nil {
+			log.Printf("Failed to cleanup stale channels: %v", err)
+		} else if count > 0 {
+			log.Printf("Cleaned up %d stale channels", count)
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/celsian/iptv-manager/internal/channels"
 )
@@ -67,9 +68,17 @@ func (s *Server) handleLocalEnabled(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, response)
 }
 
+// normalizeIPTVId ensures the ID has the "ch" prefix
+func normalizeIPTVId(id string) string {
+	if strings.HasPrefix(id, "ch") {
+		return id
+	}
+	return "ch" + id
+}
+
 // handleLocalChannel gets or updates a single channel
 func (s *Server) handleLocalChannelGet(w http.ResponseWriter, r *http.Request) {
-	iptvId := r.PathValue("iptvId")
+	iptvId := normalizeIPTVId(r.PathValue("iptvId"))
 
 	ch, ok := s.channelStore.GetChannel(iptvId)
 	if !ok {
@@ -107,12 +116,15 @@ func (s *Server) handleLocalChannelSave(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Normalize the IPTV ID
+	normalizedId := normalizeIPTVId(req.IPTVId)
+
 	// If channel number is taken, shift existing channels to make room
 	var shiftedChannels []string
 	if req.Enabled && req.ChannelNumber > 0 {
-		if s.channelStore.IsChannelNumberTaken(req.ChannelNumber, req.IPTVId) {
+		if s.channelStore.IsChannelNumberTaken(req.ChannelNumber, normalizedId) {
 			var err error
-			shiftedChannels, err = s.channelStore.ShiftChannelsFromAndSave(req.ChannelNumber, req.IPTVId)
+			shiftedChannels, err = s.channelStore.ShiftChannelsFromAndSave(req.ChannelNumber, normalizedId)
 			if err != nil {
 				http.Error(w, "Failed to shift channels: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -121,7 +133,7 @@ func (s *Server) handleLocalChannelSave(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ch := &channels.Channel{
-		IPTVId:        req.IPTVId,
+		IPTVId:        normalizedId,
 		Name:          req.Name,
 		CustomName:    req.CustomName,
 		ChannelNumber: req.ChannelNumber,
@@ -130,6 +142,7 @@ func (s *Server) handleLocalChannelSave(w http.ResponseWriter, r *http.Request) 
 		URL:           req.URL,
 		Enabled:       req.Enabled,
 		Playlist:      req.Playlist,
+		DisabledAt:    "", // Clear disabled timestamp when saving
 	}
 
 	if err := s.channelStore.SetChannel(ch); err != nil {
@@ -155,8 +168,9 @@ func (s *Server) handleLocalChannelDisable(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get the channel
-	ch, ok := s.channelStore.GetChannel(req.IPTVId)
+	// Get the channel (normalize ID)
+	normalizedId := normalizeIPTVId(req.IPTVId)
+	ch, ok := s.channelStore.GetChannel(normalizedId)
 	if !ok {
 		http.Error(w, "Channel not found", http.StatusNotFound)
 		return
@@ -164,6 +178,7 @@ func (s *Server) handleLocalChannelDisable(w http.ResponseWriter, r *http.Reques
 
 	// Disable locally
 	ch.Enabled = false
+	ch.DisabledAt = time.Now().Format(time.RFC3339)
 	if err := s.channelStore.SetChannel(ch); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -252,7 +267,7 @@ func (s *Server) handleNextChannelNumber(w http.ResponseWriter, r *http.Request)
 // handleCheckChannelConflict checks if a channel number would cause conflicts
 func (s *Server) handleCheckChannelConflict(w http.ResponseWriter, r *http.Request) {
 	channelNumStr := r.URL.Query().Get("channelNumber")
-	excludeId := r.URL.Query().Get("excludeId")
+	excludeId := normalizeIPTVId(r.URL.Query().Get("excludeId"))
 
 	channelNum, err := strconv.Atoi(channelNumStr)
 	if err != nil || channelNum <= 0 {
