@@ -103,7 +103,8 @@ func (s *Server) handlePlaylistStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleGetChannelURL looks up a channel's stream URL from the cached playlist
+// handleGetChannelURL looks up a channel's stream URL from the cached playlist,
+// falling back to the IPTV provider if not found in cache.
 func (s *Server) handleGetChannelURL(w http.ResponseWriter, r *http.Request) {
 	playlist := r.URL.Query().Get("playlist")
 	channelId := r.URL.Query().Get("channelId")
@@ -116,10 +117,16 @@ func (s *Server) handleGetChannelURL(w http.ResponseWriter, r *http.Request) {
 	var url string
 	var err error
 
+	// Try cached playlist first
 	if playlist != "" {
 		url, err = s.playlistManager.GetChannelURL(channelId, playlist)
 	} else {
 		url, err = s.playlistManager.GetChannelURLFromAnyPlaylist(channelId)
+	}
+
+	// If not found in cache, try the IPTV provider directly
+	if err != nil && s.iptvProvider != nil {
+		url, err = s.iptvProvider.GetChannelURL(channelId)
 	}
 
 	if err != nil {
