@@ -112,6 +112,9 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
     setError(null);
 
     try {
+      // If playlist is dirty, update it first to get fresh channel URLs
+      await api.playlists.updateIfDirty(playlist);
+
       // Get stream URL from the cached playlist
       let streamUrl = '';
       try {
