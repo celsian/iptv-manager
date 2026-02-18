@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Save, Plus, Trash2, RefreshCw, Download, MessageSquare, Pencil } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, RefreshCw, Download, MessageSquare, Pencil, Copy, Check } from 'lucide-react';
 import { api, type Settings as SettingsType, type PlaylistSource } from '../lib/api';
+import { copyToClipboard } from '../lib/clipboard';
 
 type SettingsTab = 'general' | 'playlists' | 'notifications';
 
@@ -37,6 +38,7 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
   const [newSource, setNewSource] = useState({ name: '', url: '', iptvPlaylist: '' });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editSource, setEditSource] = useState({ name: '', url: '', iptvPlaylist: '' });
+  const [m3uCopied, setM3uCopied] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -356,6 +358,17 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
                 <code className="flex-1 px-3 py-2 bg-slate-900 rounded text-blue-400 text-sm overflow-x-auto">
                   {window.location.origin}/m3u/iptv-manager.m3u
                 </code>
+                <button
+                  onClick={() => {
+                    copyToClipboard(`${window.location.origin}/m3u/iptv-manager.m3u`);
+                    setM3uCopied(true);
+                    setTimeout(() => setM3uCopied(false), 2000);
+                  }}
+                  className={`p-2 rounded ${m3uCopied ? 'bg-emerald-600' : 'bg-slate-700 hover:bg-slate-600'} text-white transition-colors`}
+                  title="Copy M3U URL"
+                >
+                  {m3uCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
               </div>
               <p className="text-xs text-slate-400">
                 Filter by playlist: <code className="text-blue-400">?group-title=WEST</code> or multiple: <code className="text-blue-400">?group-title=WEST,UK</code>
