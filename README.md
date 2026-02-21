@@ -13,6 +13,7 @@ A web-based IPTV channel management tool for xTeVe and Emby.
 - File-based configuration (no database)
 
 ## Quick Start
+THOUASHDIOA HTOUHAL ISJDOL
 
 ### Docker (Recommended)
 
