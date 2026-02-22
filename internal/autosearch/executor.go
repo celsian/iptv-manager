@@ -218,6 +218,8 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 			// Update existing channel
 			existingChannel.ChannelNumber = channelNum
 			existingChannel.CustomName = channelName
+			existingChannel.GroupTitle = job.Name
+			existingChannel.Playlist = job.Playlist
 			existingChannel.Enabled = true
 			existingChannel.DisabledAt = ""
 			if err := e.channelStore.SetChannel(existingChannel); err != nil {
