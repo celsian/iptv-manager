@@ -59,13 +59,19 @@ func (m *mockIPTVProvider) GetEnabledChannels(playlist string) ([]iptv.Channel, 
 	return m.enabledChannels[playlist], nil
 }
 
+func newTestExecutor(store *Store, channelStore *channels.Store, provider iptv.Provider) *Executor {
+	e := NewExecutor(store, channelStore, provider, nil, nil, "")
+	e.providerDelay = 0
+	return e
+}
+
 func TestExecutorFilterChannels(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	channels := []iptv.Channel{
 		{ID: "1", Title: "Michigan Football Game"},
@@ -126,7 +132,7 @@ func TestExecutorGenerateChannelName(t *testing.T) {
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{Name: "Michigan Football", SearchTerm: "Michigan", FilterTerms: []string{"Football"}}
 	name := executor.generateChannelName(job, 1)
@@ -153,7 +159,7 @@ func TestExecutorGetOccupiedChannelNumbers(t *testing.T) {
 	channelStore.SetChannel(&channels.Channel{IPTVId: "ch3", ChannelNumber: 102, Enabled: false}) // disabled
 	channelStore.SetChannel(&channels.Channel{IPTVId: "ch4", ChannelNumber: 103, Enabled: true})
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	// No exclusions
 	occupied := executor.getOccupiedChannelNumbers(nil)
@@ -185,7 +191,7 @@ func TestExecuteJobAddsNewChannels(t *testing.T) {
 		{ID: "2", Title: "Michigan Game 2", Enabled: false},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{
 		Name:            "Test Job",
@@ -255,7 +261,7 @@ func TestExecuteJobRemovesChannels(t *testing.T) {
 	// Search now returns empty (channel no longer available)
 	provider.searchResults["Sports:Michigan"] = []iptv.Channel{}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{
 		Name:              "Test Job",
@@ -310,7 +316,7 @@ func TestExecuteJobSkipsOccupiedNumbers(t *testing.T) {
 		{ID: "2", Title: "Michigan Game 2", Enabled: false},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{
 		Name:            "Test Job",
@@ -358,7 +364,7 @@ func TestExecuteJobUpdatesExistingChannels(t *testing.T) {
 		{ID: "1", Title: "Michigan Game 1", Enabled: true},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{
 		Name:              "Test Job",
@@ -402,7 +408,7 @@ func TestExecuteJobWithFilter(t *testing.T) {
 		{ID: "3", Title: "Michigan Football Game 2"},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{
 		Name:            "Test Job",
@@ -444,7 +450,7 @@ func TestExecuteJobNotFound(t *testing.T) {
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	result := executor.ExecuteJob("nonexistent")
 
@@ -468,7 +474,7 @@ func TestPreviewJob(t *testing.T) {
 		{ID: "3", Title: "Michigan Hockey"},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	// Preview without filter
 	job := &Job{Playlist: "Sports", SearchTerm: "Michigan"}
