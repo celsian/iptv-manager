@@ -143,6 +143,42 @@ func SendRemovedChannelsNotification(webhookURL string, removedByPlaylist map[st
 	return sendWebhook(webhookURL, msg)
 }
 
+// SendMessage sends a simple text message to the webhook
+func SendMessage(webhookURL string, message string) error {
+	if webhookURL == "" {
+		return nil
+	}
+
+	msg := WebhookMessage{
+		Content: message,
+	}
+
+	return sendWebhook(webhookURL, msg)
+}
+
+// SendErrorNotification sends an error notification with a red embed
+func SendErrorNotification(webhookURL string, title string, message string) error {
+	if webhookURL == "" {
+		return nil
+	}
+
+	msg := WebhookMessage{
+		Embeds: []Embed{
+			{
+				Title:       title,
+				Description: message,
+				Color:       0xFF0000, // Red
+				Timestamp:   time.Now().UTC().Format(time.RFC3339),
+				Footer: &Footer{
+					Text: "IPTV Manager",
+				},
+			},
+		},
+	}
+
+	return sendWebhook(webhookURL, msg)
+}
+
 func sendWebhook(webhookURL string, msg WebhookMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {

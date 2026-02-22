@@ -50,6 +50,10 @@ func (m *Manager) GetPlaylistPath(name string) string {
 	return filepath.Join(m.dataDir, "playlists", name+".m3u")
 }
 
+func (m *Manager) GetPlaylistSources() []config.PlaylistSource {
+	return m.cfg.GetAllPlaylistSources()
+}
+
 func (m *Manager) RenamePlaylist(oldName, newName string) error {
 	oldPath := m.GetPlaylistPath(oldName)
 	newPath := m.GetPlaylistPath(newName)

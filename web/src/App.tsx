@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, List, Settings as SettingsIcon, Tv } from 'lucide-react';
+import { Search, List, Settings as SettingsIcon, Tv, Zap } from 'lucide-react';
 import { ChannelSearch } from './components/ChannelSearch';
 import { EnabledChannels } from './components/EnabledChannels';
 import { Settings } from './components/Settings';
+import { AutoSearch } from './components/AutoSearch';
 
-type Tab = 'search' | 'configure' | 'settings';
+type Tab = 'search' | 'configure' | 'autosearch' | 'settings';
 
 interface Route {
   tab: Tab;
@@ -26,6 +27,9 @@ function parseRoute(pathname: string): Route {
   if (path.startsWith('/configure/')) {
     return { tab: 'configure', subPath: decodeURIComponent(path.slice('/configure/'.length)) };
   }
+  if (path === '/autosearch') {
+    return { tab: 'autosearch' };
+  }
   if (path === '/settings') {
     return { tab: 'settings', subPath: 'general' };
   }
@@ -46,6 +50,9 @@ function buildPath(tab: Tab, subPath?: string): string {
   }
   if (tab === 'configure') {
     return subPath ? `/configure/${encodeURIComponent(subPath)}` : '/configure';
+  }
+  if (tab === 'autosearch') {
+    return '/autosearch';
   }
   if (tab === 'settings') {
     return subPath ? `/settings/${subPath}` : '/settings/general';
@@ -73,6 +80,7 @@ function App() {
   const tabs = [
     { id: 'search' as const, label: 'Search Channels', icon: Search },
     { id: 'configure' as const, label: 'Configure Channels', icon: List },
+    { id: 'autosearch' as const, label: 'Auto Search', icon: Zap },
     { id: 'settings' as const, label: 'Settings', icon: SettingsIcon },
   ];
 
@@ -122,6 +130,9 @@ function App() {
             initialPlaylist={route.subPath}
             onPlaylistChange={(playlist) => navigate('configure', playlist)}
           />
+        )}
+        {route.tab === 'autosearch' && (
+          <AutoSearch />
         )}
         {route.tab === 'settings' && (
           <Settings
