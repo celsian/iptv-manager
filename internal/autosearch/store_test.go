@@ -32,7 +32,7 @@ func TestCreateAndGetJob(t *testing.T) {
 		Name:            "Test Job",
 		Playlist:        "Sports",
 		SearchTerm:      "Michigan",
-		FilterTerm:      "Football",
+		FilterTerms:     []string{"Football"},
 		StartingChannel: 1000,
 		Schedule:        "0 6 * * *",
 		Enabled:         true,
@@ -60,8 +60,8 @@ func TestCreateAndGetJob(t *testing.T) {
 	if got.SearchTerm != job.SearchTerm {
 		t.Errorf("SearchTerm = %q, want %q", got.SearchTerm, job.SearchTerm)
 	}
-	if got.FilterTerm != job.FilterTerm {
-		t.Errorf("FilterTerm = %q, want %q", got.FilterTerm, job.FilterTerm)
+	if len(got.FilterTerms) != len(job.FilterTerms) || (len(got.FilterTerms) > 0 && got.FilterTerms[0] != job.FilterTerms[0]) {
+		t.Errorf("FilterTerms = %v, want %v", got.FilterTerms, job.FilterTerms)
 	}
 	if got.StartingChannel != job.StartingChannel {
 		t.Errorf("StartingChannel = %d, want %d", got.StartingChannel, job.StartingChannel)

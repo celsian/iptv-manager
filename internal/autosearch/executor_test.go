@@ -75,27 +75,48 @@ func TestExecutorFilterChannels(t *testing.T) {
 	}
 
 	// No filter
-	filtered := executor.filterChannels(channels, "")
+	filtered := executor.filterChannels(channels, nil)
 	if len(filtered) != 4 {
 		t.Errorf("No filter: got %d channels, want 4", len(filtered))
 	}
 
-	// Filter for Football
-	filtered = executor.filterChannels(channels, "Football")
+	// Single filter for Football
+	filtered = executor.filterChannels(channels, []string{"Football"})
 	if len(filtered) != 2 {
 		t.Errorf("Football filter: got %d channels, want 2", len(filtered))
 	}
 
 	// Filter is case-insensitive
-	filtered = executor.filterChannels(channels, "football")
+	filtered = executor.filterChannels(channels, []string{"football"})
 	if len(filtered) != 2 {
 		t.Errorf("Case-insensitive filter: got %d channels, want 2", len(filtered))
 	}
 
 	// Filter with no matches
-	filtered = executor.filterChannels(channels, "Tennis")
+	filtered = executor.filterChannels(channels, []string{"Tennis"})
 	if len(filtered) != 0 {
 		t.Errorf("No match filter: got %d channels, want 0", len(filtered))
+	}
+
+	// Multiple filters with AND logic
+	filtered = executor.filterChannels(channels, []string{"Michigan", "Football"})
+	if len(filtered) != 1 {
+		t.Errorf("AND filter (Michigan + Football): got %d channels, want 1", len(filtered))
+	}
+	if filtered[0].ID != "1" {
+		t.Errorf("AND filter: got channel %s, want 1", filtered[0].ID)
+	}
+
+	// Multiple filters where no channel matches all
+	filtered = executor.filterChannels(channels, []string{"Michigan", "Tennis"})
+	if len(filtered) != 0 {
+		t.Errorf("AND filter no match: got %d channels, want 0", len(filtered))
+	}
+
+	// Empty filter terms slice
+	filtered = executor.filterChannels(channels, []string{})
+	if len(filtered) != 4 {
+		t.Errorf("Empty filter slice: got %d channels, want 4", len(filtered))
 	}
 }
 
@@ -107,13 +128,13 @@ func TestExecutorGenerateChannelName(t *testing.T) {
 
 	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
 
-	job := &Job{Name: "Michigan Football", SearchTerm: "Michigan", FilterTerm: "Football"}
+	job := &Job{Name: "Michigan Football", SearchTerm: "Michigan", FilterTerms: []string{"Football"}}
 	name := executor.generateChannelName(job, 1)
 	if name != "Michigan Football 1" {
 		t.Errorf("got %q, want %q", name, "Michigan Football 1")
 	}
 
-	job = &Job{Name: "Sports Bundle", SearchTerm: "Michigan", FilterTerm: ""}
+	job = &Job{Name: "Sports Bundle", SearchTerm: "Michigan"}
 	name = executor.generateChannelName(job, 5)
 	if name != "Sports Bundle 5" {
 		t.Errorf("got %q, want %q", name, "Sports Bundle 5")
@@ -387,7 +408,7 @@ func TestExecuteJobWithFilter(t *testing.T) {
 		Name:            "Test Job",
 		Playlist:        "Sports",
 		SearchTerm:      "Michigan",
-		FilterTerm:      "Football",
+		FilterTerms:     []string{"Football"},
 		StartingChannel: 1000,
 		Enabled:         true,
 	}
@@ -460,7 +481,7 @@ func TestPreviewJob(t *testing.T) {
 	}
 
 	// Preview with filter
-	job.FilterTerm = "Football"
+	job.FilterTerms = []string{"Football"}
 	channels, err = executor.PreviewJob(job)
 	if err != nil {
 		t.Fatalf("PreviewJob with filter failed: %v", err)

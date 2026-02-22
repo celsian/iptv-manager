@@ -137,9 +137,9 @@ func (s *Server) handleRunAutoSearchJob(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Playlist   string `json:"playlist"`
-		SearchTerm string `json:"searchTerm"`
-		FilterTerm string `json:"filterTerm"`
+		Playlist    string   `json:"playlist"`
+		SearchTerm  string   `json:"searchTerm"`
+		FilterTerms []string `json:"filterTerms"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -153,9 +153,9 @@ func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Reque
 	}
 
 	job := &autosearch.Job{
-		Playlist:   req.Playlist,
-		SearchTerm: req.SearchTerm,
-		FilterTerm: req.FilterTerm,
+		Playlist:    req.Playlist,
+		SearchTerm:  req.SearchTerm,
+		FilterTerms: req.FilterTerms,
 	}
 
 	if s.autoSearchExecutor == nil {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Loader2, Plus, Play, Pencil, Trash2, Clock, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react';
+import { useState, useEffect, type KeyboardEvent } from 'react';
+import { Loader2, Plus, Play, Pencil, Trash2, Clock, CheckCircle, XCircle, AlertCircle, Eye, X } from 'lucide-react';
 import cronstrue from 'cronstrue';
 import { api, type AutoSearchJob, type AutoSearchExecutionResult, type IPTVChannel } from '../lib/api';
 
@@ -37,11 +37,12 @@ export function AutoSearch() {
     name: '',
     playlist: '',
     searchTerm: '',
-    filterTerm: '',
+    filterTerms: [] as string[],
     startingChannel: 1000,
     schedule: '0 6 * * *',
     enabled: true,
   });
+  const [filterInput, setFilterInput] = useState('');
 
   useEffect(() => {
     loadJobs();
@@ -73,11 +74,12 @@ export function AutoSearch() {
       name: '',
       playlist: iptvPlaylists[0] || '',
       searchTerm: '',
-      filterTerm: '',
+      filterTerms: [],
       startingChannel: 1000,
       schedule: '0 6 * * *',
       enabled: true,
     });
+    setFilterInput('');
     setIsCreating(true);
     setEditingJob(null);
     setPreviewChannels(null);
@@ -88,11 +90,12 @@ export function AutoSearch() {
       name: job.name,
       playlist: job.playlist,
       searchTerm: job.searchTerm,
-      filterTerm: job.filterTerm || '',
+      filterTerms: job.filterTerms || [],
       startingChannel: job.startingChannel,
       schedule: job.schedule,
       enabled: job.enabled,
     });
+    setFilterInput('');
     setEditingJob(job);
     setIsCreating(false);
     setPreviewChannels(null);
@@ -150,7 +153,7 @@ export function AutoSearch() {
       const channels = await api.autoSearch.preview(
         formData.playlist,
         formData.searchTerm,
-        formData.filterTerm || undefined
+        formData.filterTerms.length > 0 ? formData.filterTerms : undefined
       );
       setPreviewChannels(channels);
     } catch (err) {
@@ -237,14 +240,42 @@ export function AutoSearch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Filter Term (optional)</label>
-              <input
-                type="text"
-                value={formData.filterTerm}
-                onChange={e => setFormData({ ...formData, filterTerm: e.target.value })}
-                placeholder="e.g., NCAA"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
-              />
+              <label className="block text-sm font-medium text-slate-300 mb-1">Filter Terms (optional)</label>
+              <div className="flex flex-wrap gap-1.5 p-2 bg-slate-700 border border-slate-600 rounded-lg min-h-[42px]">
+                {formData.filterTerms.map((term, i) => (
+                  <span key={i} className="flex items-center gap-1 px-2 py-0.5 bg-blue-600/30 border border-blue-500/50 text-blue-300 text-sm rounded">
+                    {term}
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, filterTerms: formData.filterTerms.filter((_, j) => j !== i) })}
+                      className="hover:text-white"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={filterInput}
+                  onChange={e => setFilterInput(e.target.value)}
+                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                    if ((e.key === 'Enter' || e.key === ',') && filterInput.trim()) {
+                      e.preventDefault();
+                      const term = filterInput.trim().replace(/,$/,'');
+                      if (term && !formData.filterTerms.includes(term)) {
+                        setFormData({ ...formData, filterTerms: [...formData.filterTerms, term] });
+                      }
+                      setFilterInput('');
+                    }
+                    if (e.key === 'Backspace' && !filterInput && formData.filterTerms.length > 0) {
+                      setFormData({ ...formData, filterTerms: formData.filterTerms.slice(0, -1) });
+                    }
+                  }}
+                  placeholder={formData.filterTerms.length === 0 ? 'Type and press Enter...' : ''}
+                  className="flex-1 min-w-[120px] bg-transparent text-white placeholder-slate-400 outline-none text-sm"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Channel must match ALL terms. Press Enter to add.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">Starting Channel Number</label>
@@ -386,10 +417,10 @@ export function AutoSearch() {
                         <span className="text-slate-500">Playlist:</span> {job.playlist}
                         {' | '}
                         <span className="text-slate-500">Search:</span> {job.searchTerm}
-                        {job.filterTerm && (
+                        {job.filterTerms && job.filterTerms.length > 0 && (
                           <>
                             {' | '}
-                            <span className="text-slate-500">Filter:</span> {job.filterTerm}
+                            <span className="text-slate-500">Filter:</span> {job.filterTerms.join(', ')}
                           </>
                         )}
                       </p>

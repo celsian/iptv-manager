@@ -66,8 +66,8 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 		return result
 	}
 
-	// Filter results if filter term is provided
-	matchedChannels := e.filterChannels(searchResults, job.FilterTerm)
+	// Filter results if filter terms are provided
+	matchedChannels := e.filterChannels(searchResults, job.FilterTerms)
 
 	log.Printf("AutoSearch: Job %s found %d channels matching criteria", job.Name, len(matchedChannels))
 
@@ -165,15 +165,22 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	return result
 }
 
-func (e *Executor) filterChannels(channels []iptv.Channel, filterTerm string) []iptv.Channel {
-	if filterTerm == "" {
+func (e *Executor) filterChannels(channels []iptv.Channel, filterTerms []string) []iptv.Channel {
+	if len(filterTerms) == 0 {
 		return channels
 	}
 
-	filterLower := strings.ToLower(filterTerm)
 	var filtered []iptv.Channel
 	for _, ch := range channels {
-		if strings.Contains(strings.ToLower(ch.Title), filterLower) {
+		titleLower := strings.ToLower(ch.Title)
+		matchesAll := true
+		for _, term := range filterTerms {
+			if !strings.Contains(titleLower, strings.ToLower(term)) {
+				matchesAll = false
+				break
+			}
+		}
+		if matchesAll {
 			filtered = append(filtered, ch)
 		}
 	}
@@ -311,7 +318,7 @@ func (e *Executor) PreviewJob(job *Job) ([]iptv.Channel, error) {
 		return nil, err
 	}
 
-	return e.filterChannels(searchResults, job.FilterTerm), nil
+	return e.filterChannels(searchResults, job.FilterTerms), nil
 }
 
 func normalizeChannelID(id string) string {
