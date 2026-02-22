@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Plus, Play, Pencil, Trash2, Clock, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react';
+import cronstrue from 'cronstrue';
 import { api, type AutoSearchJob, type AutoSearchExecutionResult, type IPTVChannel } from '../lib/api';
+
+function describeCron(expression: string): string {
+  try {
+    return cronstrue.toString(expression, { use24HourTimeFormat: false });
+  } catch {
+    return '';
+  }
+}
 
 export function AutoSearch() {
   const [jobs, setJobs] = useState<AutoSearchJob[]>([]);
@@ -245,7 +254,11 @@ export function AutoSearch() {
                 placeholder="0 6 * * *"
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
               />
-              <p className="text-xs text-slate-500 mt-1">e.g., "0 6 * * *" = daily at 6:00 AM</p>
+              {formData.schedule && describeCron(formData.schedule) ? (
+                <p className="text-xs text-emerald-400 mt-1">{describeCron(formData.schedule)}</p>
+              ) : (
+                <p className="text-xs text-slate-500 mt-1">e.g., "0 6 * * *" = daily at 6:00 AM</p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -367,7 +380,8 @@ export function AutoSearch() {
                       <p>
                         <span className="text-slate-500">Starting Ch#:</span> {job.startingChannel}
                         {' | '}
-                        <span className="text-slate-500">Schedule:</span> <code className="text-blue-400">{job.schedule}</code>
+                        <span className="text-slate-500">Schedule:</span>{' '}
+                        {describeCron(job.schedule) || <code className="text-blue-400">{job.schedule}</code>}
                         {' | '}
                         <span className="text-slate-500">Managed:</span> {job.managedChannelIds?.length || 0} channels
                       </p>

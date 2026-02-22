@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/celsian/iptv-manager/internal/autosearch"
+	"github.com/robfig/cron/v3"
 )
 
 func (s *Server) handleGetAutoSearchJobs(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +35,13 @@ func (s *Server) handleCreateAutoSearchJob(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if job.Schedule != "" {
+		if _, err := cron.ParseStandard(job.Schedule); err != nil {
+			http.Error(w, "Invalid cron expression: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	if err := s.autoSearchStore.CreateJob(&job); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -61,6 +69,13 @@ func (s *Server) handleUpdateAutoSearchJob(w http.ResponseWriter, r *http.Reques
 	if job.Name == "" || job.Playlist == "" || job.SearchTerm == "" || job.StartingChannel <= 0 {
 		http.Error(w, "Name, playlist, searchTerm, and startingChannel are required", http.StatusBadRequest)
 		return
+	}
+
+	if job.Schedule != "" {
+		if _, err := cron.ParseStandard(job.Schedule); err != nil {
+			http.Error(w, "Invalid cron expression: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	if err := s.autoSearchStore.UpdateJob(&job); err != nil {
