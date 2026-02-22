@@ -14,7 +14,7 @@ func TestNewScheduler(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 
@@ -34,7 +34,7 @@ func TestSchedulerStartStop(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 
@@ -48,7 +48,7 @@ func TestSchedulerReloadJobs(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	// Add jobs before creating scheduler
 	store.CreateJob(&Job{
@@ -87,7 +87,7 @@ func TestSchedulerAddJob(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
@@ -120,7 +120,7 @@ func TestSchedulerAddDisabledJob(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
@@ -153,7 +153,7 @@ func TestSchedulerRemoveJob(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
@@ -192,7 +192,7 @@ func TestSchedulerRunJobNow(t *testing.T) {
 		{ID: "1", Title: "Michigan Game"},
 	}
 
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
 	defer scheduler.Stop()
@@ -222,7 +222,7 @@ func TestSchedulerJobWithEmptySchedule(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
@@ -255,7 +255,7 @@ func TestSchedulerJobReplacesExisting(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()
@@ -296,7 +296,7 @@ func TestSchedulerConcurrentAccess(t *testing.T) {
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
-	executor := NewExecutor(store, channelStore, provider, nil, nil, "")
+	executor := newTestExecutor(store, channelStore, provider)
 
 	scheduler := NewScheduler(executor, store)
 	scheduler.Start()

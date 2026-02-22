@@ -30,6 +30,7 @@ type Executor struct {
 	playlistManager *playlists.Manager
 	embyClient      *emby.Client
 	discordWebhook  string
+	providerDelay   time.Duration
 }
 
 func NewExecutor(store *Store, channelStore *channels.Store, iptvProvider iptv.Provider, playlistManager *playlists.Manager, embyClient *emby.Client, discordWebhook string) *Executor {
@@ -40,6 +41,7 @@ func NewExecutor(store *Store, channelStore *channels.Store, iptvProvider iptv.P
 		playlistManager: playlistManager,
 		embyClient:      embyClient,
 		discordWebhook:  discordWebhook,
+		providerDelay:   1 * time.Second,
 	}
 }
 
@@ -119,9 +121,21 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 		}
 	}
 
-	// Refresh the playlist to get updated M3U with newly enabled channels
+	// Get all currently matched channels (existing + new) and assign channel numbers
+	allManagedIDs := e.assignChannelNumbers(job, matchedChannels, &result)
+
+	// Update job with new managed channel IDs
+	if err := e.store.UpdateManagedChannels(job.ID, allManagedIDs); err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("Failed to update managed channels: %v", err))
+	}
+
+	// Wait for the IPTV provider to process toggle changes before refreshing
+	if e.providerDelay > 0 {
+		time.Sleep(e.providerDelay)
+	}
+
+	// Refresh the playlist to get updated M3U reflecting all enable/disable changes
 	if e.playlistManager != nil {
-		// Find the local playlist name that corresponds to this IPTV playlist
 		if playlistName := e.findLocalPlaylistName(job.Playlist); playlistName != "" {
 			if err := e.playlistManager.UpdatePlaylist(playlistName); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("Failed to refresh playlist: %v", err))
@@ -130,14 +144,6 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 				log.Printf("AutoSearch: Job %s refreshed playlist %s", job.Name, playlistName)
 			}
 		}
-	}
-
-	// Get all currently matched channels (existing + new) and assign channel numbers
-	allManagedIDs := e.assignChannelNumbers(job, matchedChannels, &result)
-
-	// Update job with new managed channel IDs
-	if err := e.store.UpdateManagedChannels(job.ID, allManagedIDs); err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("Failed to update managed channels: %v", err))
 	}
 
 	// Refresh Emby guide
