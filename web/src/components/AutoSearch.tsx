@@ -15,12 +15,10 @@ function isMoreThanOnceDaily(expression: string): boolean {
   const parts = expression.trim().split(/\s+/);
   if (parts.length !== 5) return false;
   const [minute, hour] = parts;
-  if (minute.includes(',') || minute.includes('/') || minute === '*') {
-    return true;
-  }
-  if (hour.includes(',') || hour.includes('/') || hour === '*') {
-    return true;
-  }
+  const hasMultiple = (field: string) =>
+    field === '*' || field.includes(',') || field.includes('/') || field.includes('-');
+  if (hasMultiple(minute)) return true;
+  if (hasMultiple(hour)) return true;
   return false;
 }
 
