@@ -11,6 +11,19 @@ function describeCron(expression: string): string {
   }
 }
 
+function isMoreThanOnceDaily(expression: string): boolean {
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) return false;
+  const [minute, hour] = parts;
+  if (minute.includes(',') || minute.includes('/') || minute === '*') {
+    return true;
+  }
+  if (hour.includes(',') || hour.includes('/') || hour === '*') {
+    return true;
+  }
+  return false;
+}
+
 export function AutoSearch() {
   const [jobs, setJobs] = useState<AutoSearchJob[]>([]);
   const [iptvPlaylists, setIptvPlaylists] = useState<string[]>([]);
@@ -255,7 +268,12 @@ export function AutoSearch() {
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
               />
               {formData.schedule && describeCron(formData.schedule) ? (
-                <p className="text-xs text-emerald-400 mt-1">{describeCron(formData.schedule)}</p>
+                <>
+                  <p className="text-xs text-emerald-400 mt-1">{describeCron(formData.schedule)}</p>
+                  {isMoreThanOnceDaily(formData.schedule) && (
+                    <p className="text-xs text-yellow-400 mt-1">Warning: This schedule runs more than once per day. This is usually unnecessary and may cause excessive API calls.</p>
+                  )}
+                </>
               ) : (
                 <p className="text-xs text-slate-500 mt-1">e.g., "0 6 * * *" = daily at 6:00 AM</p>
               )}
