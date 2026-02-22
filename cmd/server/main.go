@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/celsian/iptv-manager/internal/api"
+	"github.com/celsian/iptv-manager/internal/autosearch"
 	"github.com/celsian/iptv-manager/internal/channels"
 	"github.com/celsian/iptv-manager/internal/config"
+	"github.com/celsian/iptv-manager/internal/emby"
+	"github.com/celsian/iptv-manager/internal/iptv"
 	"github.com/celsian/iptv-manager/internal/playlists"
 )
 
@@ -55,7 +58,23 @@ func main() {
 	playlistManager := playlists.NewManager(cfgManager, channelStore, dataDir)
 	playlistManager.StartScheduler()
 
+	// Initialize auto search
+	autoSearchPath := filepath.Join(dataDir, "autosearch.json")
+	autoSearchStore, err := autosearch.NewStore(autoSearchPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize auto search store: %v", err)
+	}
+
+	iptvProvider := iptv.NewProvider(cfgManager)
+	embyClient := emby.NewClient(cfgManager)
+	discordWebhook := cfgManager.Get().DiscordWebhook
+
+	autoSearchExecutor := autosearch.NewExecutor(autoSearchStore, channelStore, iptvProvider, playlistManager, embyClient, discordWebhook)
+	autoSearchScheduler := autosearch.NewScheduler(autoSearchExecutor, autoSearchStore)
+	autoSearchScheduler.Start()
+
 	server := api.NewServer(cfgManager, channelStore, playlistManager, staticFS)
+	server.SetAutoSearch(autoSearchStore, autoSearchExecutor, autoSearchScheduler)
 
 	addr := ":" + *port
 	httpServer := &http.Server{
@@ -79,6 +98,7 @@ func main() {
 	<-stop
 	log.Println("Shutting down...")
 
+	autoSearchScheduler.Stop()
 	playlistManager.StopScheduler()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

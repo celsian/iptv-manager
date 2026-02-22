@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/celsian/iptv-manager/internal/autosearch"
 	"github.com/celsian/iptv-manager/internal/channels"
 	"github.com/celsian/iptv-manager/internal/config"
 	"github.com/celsian/iptv-manager/internal/emby"
@@ -13,12 +14,15 @@ import (
 )
 
 type Server struct {
-	cfg             *config.Manager
-	iptvProvider    iptv.Provider
-	embyClient      *emby.Client
-	channelStore    *channels.Store
-	playlistManager *playlists.Manager
-	staticFS        embed.FS
+	cfg                 *config.Manager
+	iptvProvider        iptv.Provider
+	embyClient          *emby.Client
+	channelStore        *channels.Store
+	playlistManager     *playlists.Manager
+	autoSearchStore     *autosearch.Store
+	autoSearchExecutor  *autosearch.Executor
+	autoSearchScheduler *autosearch.Scheduler
+	staticFS            embed.FS
 }
 
 func NewServer(cfg *config.Manager, channelStore *channels.Store, playlistManager *playlists.Manager, staticFS embed.FS) *Server {
@@ -30,6 +34,12 @@ func NewServer(cfg *config.Manager, channelStore *channels.Store, playlistManage
 		playlistManager: playlistManager,
 		staticFS:        staticFS,
 	}
+}
+
+func (s *Server) SetAutoSearch(store *autosearch.Store, executor *autosearch.Executor, scheduler *autosearch.Scheduler) {
+	s.autoSearchStore = store
+	s.autoSearchExecutor = executor
+	s.autoSearchScheduler = scheduler
 }
 
 func (s *Server) Router() http.Handler {
@@ -77,6 +87,15 @@ func (s *Server) Router() http.Handler {
 
 	// Discord
 	mux.HandleFunc("POST /api/discord/test", s.handleTestDiscordWebhook)
+
+	// Auto Search Jobs
+	mux.HandleFunc("GET /api/autosearch/jobs", s.handleGetAutoSearchJobs)
+	mux.HandleFunc("GET /api/autosearch/jobs/{id}", s.handleGetAutoSearchJob)
+	mux.HandleFunc("POST /api/autosearch/jobs", s.handleCreateAutoSearchJob)
+	mux.HandleFunc("PUT /api/autosearch/jobs/{id}", s.handleUpdateAutoSearchJob)
+	mux.HandleFunc("DELETE /api/autosearch/jobs/{id}", s.handleDeleteAutoSearchJob)
+	mux.HandleFunc("POST /api/autosearch/jobs/{id}/run", s.handleRunAutoSearchJob)
+	mux.HandleFunc("POST /api/autosearch/preview", s.handlePreviewAutoSearchJob)
 
 	// Serve static files
 	staticContent, err := fs.Sub(s.staticFS, "web/dist")

@@ -51,6 +51,30 @@ export interface ProviderInfo {
   description: string;
 }
 
+export interface AutoSearchJob {
+  id: string;
+  name: string;
+  playlist: string;
+  searchTerm: string;
+  filterTerms?: string[];
+  startingChannel: number;
+  schedule: string;
+  enabled: boolean;
+  lastRun?: string;
+  lastRunStatus?: string;
+  lastRunMessage?: string;
+  managedChannelIds: string[];
+}
+
+export interface AutoSearchExecutionResult {
+  success: boolean;
+  message: string;
+  channelsAdded: number;
+  channelsRemoved: number;
+  channelsUpdated: number;
+  errors?: string[];
+}
+
 export interface Settings {
   iptv: {
     provider: string;
@@ -207,6 +231,41 @@ export const api = {
       request<{ success: boolean }>('/discord/test', {
         method: 'POST',
         body: JSON.stringify({ webhookUrl }),
+      }),
+  },
+
+  // Auto Search Jobs
+  autoSearch: {
+    list: () => request<AutoSearchJob[]>('/autosearch/jobs'),
+
+    get: (id: string) => request<AutoSearchJob>(`/autosearch/jobs/${id}`),
+
+    create: (job: Omit<AutoSearchJob, 'id' | 'lastRun' | 'lastRunStatus' | 'lastRunMessage' | 'managedChannelIds'>) =>
+      request<AutoSearchJob>('/autosearch/jobs', {
+        method: 'POST',
+        body: JSON.stringify(job),
+      }),
+
+    update: (id: string, job: Partial<AutoSearchJob>) =>
+      request<AutoSearchJob>(`/autosearch/jobs/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(job),
+      }),
+
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/autosearch/jobs/${id}`, {
+        method: 'DELETE',
+      }),
+
+    run: (id: string) =>
+      request<AutoSearchExecutionResult>(`/autosearch/jobs/${id}/run`, {
+        method: 'POST',
+      }),
+
+    preview: (playlist: string, searchTerm: string, filterTerms?: string[]) =>
+      request<IPTVChannel[]>('/autosearch/preview', {
+        method: 'POST',
+        body: JSON.stringify({ playlist, searchTerm, filterTerms }),
       }),
   },
 };
