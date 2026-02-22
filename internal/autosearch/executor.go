@@ -218,7 +218,7 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 			// Update existing channel
 			existingChannel.ChannelNumber = channelNum
 			existingChannel.CustomName = channelName
-			existingChannel.GroupTitle = job.Name
+			existingChannel.GroupTitle = job.Playlist
 			existingChannel.Playlist = job.Playlist
 			existingChannel.Enabled = true
 			existingChannel.DisabledAt = ""
@@ -234,7 +234,7 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 				Name:          ch.Title,
 				CustomName:    channelName,
 				ChannelNumber: channelNum,
-				GroupTitle:    job.Name,
+				GroupTitle:    job.Playlist,
 				Enabled:       true,
 				Playlist:      job.Playlist,
 			}
