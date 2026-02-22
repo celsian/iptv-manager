@@ -124,7 +124,7 @@ func (p *IPTorrentsProvider) Toggle(playlist, channelID string, enable bool) err
 		"jxt": {"4"},
 		"jxw": {"s"},
 		"s":   {playlist},
-		"c":   {channelID},
+		"c":   {normalizeID(channelID)},
 	}
 
 	if enable {
@@ -145,7 +145,7 @@ func (p *IPTorrentsProvider) GetChannelURL(channelID string) (string, error) {
 	data := url.Values{
 		"jxt": {"5"},
 		"jxw": {"play"},
-		"c":   {channelID},
+		"c":   {normalizeID(channelID)},
 	}
 
 	req, err := http.NewRequest("POST", cfg.IPTV.APIAddress, strings.NewReader(data.Encode()))
@@ -303,4 +303,12 @@ func (p *IPTorrentsProvider) GetEnabledChannels(playlist string) ([]Channel, err
 	}
 
 	return enabled, nil
+}
+
+// normalizeID ensures the channel ID has the "ch" prefix expected by the provider.
+func normalizeID(id string) string {
+	if strings.HasPrefix(id, "ch") {
+		return id
+	}
+	return "ch" + id
 }

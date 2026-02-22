@@ -80,9 +80,10 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	}
 
 	// Determine which channels to add/keep/remove
+	// Normalize provider IDs to match the stored format
 	currentMatched := make(map[string]bool)
 	for _, ch := range matchedChannels {
-		currentMatched[ch.ID] = true
+		currentMatched[normalizeChannelID(ch.ID)] = true
 	}
 
 	// Channels to remove (were managed but no longer match)
@@ -96,7 +97,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	// Channels to add (match but weren't managed)
 	var channelsToAdd []iptv.Channel
 	for _, ch := range matchedChannels {
-		if !previouslyManaged[ch.ID] {
+		if !previouslyManaged[normalizeChannelID(ch.ID)] {
 			channelsToAdd = append(channelsToAdd, ch)
 		}
 	}
@@ -293,9 +294,8 @@ func (e *Executor) disableChannel(channelID string, job *Job) error {
 		return nil // Channel doesn't exist locally, nothing to disable
 	}
 
-	// Disable on IPTV provider
-	rawID := strings.TrimPrefix(channelID, "ch")
-	if err := e.iptvProvider.Toggle(job.Playlist, rawID, false); err != nil {
+	// Disable on IPTV provider (provider normalizes the ID internally)
+	if err := e.iptvProvider.Toggle(job.Playlist, channelID, false); err != nil {
 		log.Printf("AutoSearch: Warning - failed to disable channel %s on IPTV provider: %v", channelID, err)
 	}
 
