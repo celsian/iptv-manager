@@ -101,13 +101,9 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Disable all channels managed by this job
+	// Remove all channels managed by this job
 	for _, channelID := range job.ManagedChannelIDs {
-		if ch, exists := s.channelStore.GetChannel(channelID); exists {
-			ch.Enabled = false
-			ch.ChannelNumber = 0
-			s.channelStore.SetChannel(ch)
-		}
+		s.channelStore.DeleteChannel(channelID)
 	}
 
 	if err := s.autoSearchStore.DeleteJob(id); err != nil {

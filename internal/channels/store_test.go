@@ -528,3 +528,53 @@ func TestCleanupStaleChannels(t *testing.T) {
 		t.Error("ch4 should still exist")
 	}
 }
+
+func TestDeleteChannelsByPlaylist(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, _ := NewStore(filepath.Join(tmpDir, "channels.json"))
+
+	store.SetChannel(&Channel{IPTVId: "ch1", Name: "Ch 1", Playlist: "WEST", Enabled: true})
+	store.SetChannel(&Channel{IPTVId: "ch2", Name: "Ch 2", Playlist: "WEST", Enabled: false})
+	store.SetChannel(&Channel{IPTVId: "ch3", Name: "Ch 3", Playlist: "UK", Enabled: true})
+	store.SetChannel(&Channel{IPTVId: "ch4", Name: "Ch 4", Playlist: "UK", Enabled: true})
+
+	count, err := store.DeleteChannelsByPlaylist("WEST")
+	if err != nil {
+		t.Fatalf("DeleteChannelsByPlaylist failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("DeleteChannelsByPlaylist removed %d, want 2", count)
+	}
+
+	if _, ok := store.GetChannel("ch1"); ok {
+		t.Error("ch1 should be deleted")
+	}
+	if _, ok := store.GetChannel("ch2"); ok {
+		t.Error("ch2 should be deleted")
+	}
+	if _, ok := store.GetChannel("ch3"); !ok {
+		t.Error("ch3 should still exist")
+	}
+	if _, ok := store.GetChannel("ch4"); !ok {
+		t.Error("ch4 should still exist")
+	}
+}
+
+func TestDeleteChannelsByPlaylistNoMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, _ := NewStore(filepath.Join(tmpDir, "channels.json"))
+
+	store.SetChannel(&Channel{IPTVId: "ch1", Name: "Ch 1", Playlist: "WEST"})
+
+	count, err := store.DeleteChannelsByPlaylist("NONEXISTENT")
+	if err != nil {
+		t.Fatalf("DeleteChannelsByPlaylist failed: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("DeleteChannelsByPlaylist removed %d, want 0", count)
+	}
+
+	if _, ok := store.GetChannel("ch1"); !ok {
+		t.Error("ch1 should still exist")
+	}
+}

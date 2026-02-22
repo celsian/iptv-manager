@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -226,6 +227,23 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		newCfg.Emby.APIKey = currentCfg.Emby.APIKey
 	}
 
+	// Build set of new playlist names
+	newPlaylistNames := make(map[string]bool)
+	for _, src := range newCfg.PlaylistSources {
+		if src.Name != "" {
+			newPlaylistNames[src.Name] = true
+		}
+	}
+
+	// Detect removed playlists and clean up
+	for _, src := range currentCfg.PlaylistSources {
+		if src.Name != "" && !newPlaylistNames[src.Name] {
+			s.playlistManager.DeletePlaylist(src.Name)
+			s.channelStore.DeleteChannelsByPlaylist(src.Name)
+			log.Printf("Deleted playlist %s and its channels", src.Name)
+		}
+	}
+
 	// Detect playlist name changes and rename files/channels
 	if len(currentCfg.PlaylistSources) == len(newCfg.PlaylistSources) {
 		for i := range newCfg.PlaylistSources {
@@ -250,6 +268,47 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, map[string]bool{"success": true})
+}
+
+// Channel cleanup
+
+func (s *Server) handleCleanupChannels(w http.ResponseWriter, r *http.Request) {
+	// Refresh any dirty playlists first to ensure we have the latest M3U data
+	for _, src := range s.cfg.GetAllPlaylistSources() {
+		if s.playlistManager.IsDirty(src.Name) {
+			if err := s.playlistManager.UpdatePlaylist(src.Name); err != nil {
+				log.Printf("Channel cleanup: failed to refresh dirty playlist %s: %v", src.Name, err)
+			}
+		}
+	}
+
+	// Build set of channel IDs present in any playlist M3U
+	inPlaylist := make(map[string]bool)
+	for _, src := range s.cfg.GetAllPlaylistSources() {
+		for _, ch := range s.playlistManager.GetPlaylistChannels(src.Name) {
+			inPlaylist[ch.ID] = true
+		}
+	}
+
+	// Find disabled channels not in any playlist
+	type removedChannel struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	var removed []removedChannel
+	for _, ch := range s.channelStore.GetAllChannels() {
+		if !ch.Enabled && !inPlaylist[ch.IPTVId] {
+			name := ch.CustomName
+			if name == "" {
+				name = ch.Name
+			}
+			removed = append(removed, removedChannel{ID: ch.IPTVId, Name: name})
+			s.channelStore.DeleteChannel(ch.IPTVId)
+		}
+	}
+
+	log.Printf("Channel cleanup: removed %d disabled channels not in any playlist", len(removed))
+	respondJSON(w, map[string]interface{}{"removed": len(removed), "channels": removed})
 }
 
 // Emby handlers

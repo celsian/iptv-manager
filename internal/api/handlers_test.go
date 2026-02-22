@@ -525,6 +525,150 @@ func TestRespondJSON(t *testing.T) {
 	}
 }
 
+func TestHandleCleanupChannels(t *testing.T) {
+	server, tmpDir := setupTestServer(t)
+
+	// Create an M3U file with one channel
+	playlistDir := filepath.Join(tmpDir, "playlists")
+	os.MkdirAll(playlistDir, 0755)
+	m3u := "#EXTM3U\n#EXTINF:-1 tvg-id=\"ch1\",Channel One\nhttp://example.com/1\n"
+	os.WriteFile(filepath.Join(playlistDir, "Test.m3u"), []byte(m3u), 0644)
+
+	// ch1: disabled but in playlist M3U -> should NOT be removed
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch1", Name: "Channel One", Enabled: false, Playlist: "Test",
+	})
+	// ch2: disabled and NOT in playlist M3U -> should be removed
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch2", Name: "Channel Two", Enabled: false, Playlist: "Test",
+	})
+	// ch3: enabled and NOT in playlist M3U -> should NOT be removed (still enabled)
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch3", Name: "Channel Three", Enabled: true, Playlist: "Test",
+	})
+
+	req := httptest.NewRequest("POST", "/api/channels/cleanup", nil)
+	w := httptest.NewRecorder()
+	server.handleCleanupChannels(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	var resp struct {
+		Removed  int `json:"removed"`
+		Channels []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"channels"`
+	}
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Removed != 1 {
+		t.Errorf("Removed = %d, want 1", resp.Removed)
+	}
+	if len(resp.Channels) != 1 {
+		t.Fatalf("Channels length = %d, want 1", len(resp.Channels))
+	}
+	if resp.Channels[0].ID != "ch2" {
+		t.Errorf("Removed channel ID = %q, want %q", resp.Channels[0].ID, "ch2")
+	}
+	if resp.Channels[0].Name != "Channel Two" {
+		t.Errorf("Removed channel name = %q, want %q", resp.Channels[0].Name, "Channel Two")
+	}
+
+	// Verify ch1 and ch3 still exist
+	if _, ok := server.channelStore.GetChannel("ch1"); !ok {
+		t.Error("ch1 should still exist (disabled but in playlist)")
+	}
+	if _, ok := server.channelStore.GetChannel("ch3"); !ok {
+		t.Error("ch3 should still exist (enabled)")
+	}
+	// Verify ch2 is gone
+	if _, ok := server.channelStore.GetChannel("ch2"); ok {
+		t.Error("ch2 should be deleted")
+	}
+}
+
+func TestHandleCleanupChannelsNoneToRemove(t *testing.T) {
+	server, tmpDir := setupTestServer(t)
+
+	playlistDir := filepath.Join(tmpDir, "playlists")
+	os.MkdirAll(playlistDir, 0755)
+	m3u := "#EXTM3U\n#EXTINF:-1 tvg-id=\"ch1\",Channel One\nhttp://example.com/1\n"
+	os.WriteFile(filepath.Join(playlistDir, "Test.m3u"), []byte(m3u), 0644)
+
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch1", Name: "Channel One", Enabled: true, Playlist: "Test",
+	})
+
+	req := httptest.NewRequest("POST", "/api/channels/cleanup", nil)
+	w := httptest.NewRecorder()
+	server.handleCleanupChannels(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	var resp struct {
+		Removed int `json:"removed"`
+	}
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Removed != 0 {
+		t.Errorf("Removed = %d, want 0", resp.Removed)
+	}
+}
+
+func TestHandleUpdateSettingsDeletesPlaylist(t *testing.T) {
+	server, tmpDir := setupTestServer(t)
+
+	// Create M3U file for existing playlist
+	playlistDir := filepath.Join(tmpDir, "playlists")
+	os.MkdirAll(playlistDir, 0755)
+	os.WriteFile(filepath.Join(playlistDir, "Test.m3u"), []byte("#EXTM3U\n"), 0644)
+
+	// Add channels for the playlist
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch1", Name: "Ch 1", Playlist: "Test", Enabled: true,
+	})
+	server.channelStore.SetChannel(&channels.Channel{
+		IPTVId: "ch2", Name: "Ch 2", Playlist: "Test", Enabled: false,
+	})
+
+	// Update settings with no playlists (removing "Test")
+	body := map[string]interface{}{
+		"iptv":               map[string]string{"provider": "iptorrents"},
+		"emby":               map[string]string{},
+		"playlistSources":    []interface{}{},
+		"playlistUpdateTime": "03:00",
+		"discordWebhook":     "",
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	server.handleUpdateSettings(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	// M3U file should be gone
+	if _, err := os.Stat(filepath.Join(playlistDir, "Test.m3u")); !os.IsNotExist(err) {
+		t.Error("Playlist M3U file should be deleted")
+	}
+
+	// Channels should be gone
+	if _, ok := server.channelStore.GetChannel("ch1"); ok {
+		t.Error("ch1 should be deleted when playlist is removed")
+	}
+	if _, ok := server.channelStore.GetChannel("ch2"); ok {
+		t.Error("ch2 should be deleted when playlist is removed")
+	}
+}
+
 func contains(s, substr string) bool {
 	return bytes.Contains([]byte(s), []byte(substr))
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Save, Plus, Trash2, RefreshCw, Download, MessageSquare, Pencil, Copy, Check } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, RefreshCw, Download, MessageSquare, Pencil, Copy, Check, Eraser } from 'lucide-react';
 import { api, type Settings as SettingsType, type PlaylistSource } from '../lib/api';
 import { copyToClipboard } from '../lib/clipboard';
 
@@ -24,6 +24,8 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
   const [updatingPlaylists, setUpdatingPlaylists] = useState(false);
   const [updatingPlaylist, setUpdatingPlaylist] = useState<string | null>(null);
   const [testingWebhook, setTestingWebhook] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{ removed: number; channels: { id: string; name: string }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -203,6 +205,21 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
       setError(err instanceof Error ? err.message : 'Failed to send test message');
     } finally {
       setTestingWebhook(false);
+    }
+  };
+
+  const handleCleanupChannels = async () => {
+    setCleaningUp(true);
+    setError(null);
+    setCleanupResult(null);
+
+    try {
+      const result = await api.channels.cleanup();
+      setCleanupResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clean up channels');
+    } finally {
+      setCleaningUp(false);
     }
   };
 
@@ -422,6 +439,43 @@ export function Settings({ initialTab, onTabChange }: SettingsProps) {
                 Refresh Guide
               </button>
             </div>
+          </section>
+
+          {/* Maintenance */}
+          <section className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Maintenance</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Remove disabled channels that are no longer present in any playlist M3U file.
+            </p>
+            <button
+              onClick={handleCleanupChannels}
+              disabled={cleaningUp}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 transition-colors"
+            >
+              {cleaningUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
+              Clean Up Stale Channels
+            </button>
+
+            {cleanupResult && (
+              <div className="mt-4 p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <p className="text-sm font-medium text-white mb-2">
+                  Removed {cleanupResult.removed} channel{cleanupResult.removed !== 1 ? 's' : ''}
+                </p>
+                {cleanupResult.channels && cleanupResult.channels.length > 0 ? (
+                  <ul className="text-sm text-slate-400 space-y-1 max-h-48 overflow-y-auto">
+                    {cleanupResult.channels.map(ch => (
+                      <li key={ch.id} className="flex items-center gap-2">
+                        <span className="text-red-400">&times;</span>
+                        <span>{ch.name || ch.id}</span>
+                        <span className="text-slate-500 text-xs">({ch.id})</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-400">No stale channels found.</p>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}

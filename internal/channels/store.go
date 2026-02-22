@@ -121,6 +121,26 @@ func (s *Store) DeleteChannel(iptvId string) error {
 	return s.saveLocked()
 }
 
+func (s *Store) DeleteChannelsByPlaylist(playlist string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for id, ch := range s.channels {
+		if ch.Playlist == playlist {
+			delete(s.channels, id)
+			count++
+		}
+	}
+
+	if count > 0 {
+		if err := s.saveLocked(); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
 func (s *Store) GetAllChannels() []*Channel {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

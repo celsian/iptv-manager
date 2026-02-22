@@ -590,3 +590,42 @@ func TestUpdatePlaylistIfDirty(t *testing.T) {
 		t.Error("Should not be dirty after update")
 	}
 }
+
+func TestDeletePlaylist(t *testing.T) {
+	manager, tmpDir := setupTestManager(t)
+
+	// Create a playlist file
+	playlistDir := filepath.Join(tmpDir, "playlists")
+	os.MkdirAll(playlistDir, 0755)
+	playlistPath := manager.GetPlaylistPath("Test")
+	os.WriteFile(playlistPath, []byte("#EXTM3U\n"), 0644)
+
+	// Pre-populate cache
+	manager.MarkDirty("Test")
+	_ = manager.GetPlaylistChannels("Test")
+
+	err := manager.DeletePlaylist("Test")
+	if err != nil {
+		t.Fatalf("DeletePlaylist failed: %v", err)
+	}
+
+	// File should be gone
+	if _, err := os.Stat(playlistPath); !os.IsNotExist(err) {
+		t.Error("Playlist file should be deleted")
+	}
+
+	// Cache should be cleared
+	if manager.IsDirty("Test") {
+		t.Error("Dirty flag should be cleared")
+	}
+}
+
+func TestDeletePlaylistNotFound(t *testing.T) {
+	manager, _ := setupTestManager(t)
+
+	// Should not error when file doesn't exist
+	err := manager.DeletePlaylist("NonExistent")
+	if err != nil {
+		t.Fatalf("DeletePlaylist should not error for missing file: %v", err)
+	}
+}
