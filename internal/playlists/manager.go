@@ -82,6 +82,22 @@ func (m *Manager) RenamePlaylist(oldName, newName string) error {
 	return nil
 }
 
+func (m *Manager) DeletePlaylist(name string) error {
+	path := m.GetPlaylistPath(name)
+
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete playlist file: %w", err)
+	}
+
+	m.mu.Lock()
+	delete(m.cachedChannels, name)
+	delete(m.dirtyPlaylists, name)
+	m.mu.Unlock()
+
+	log.Printf("Deleted playlist file: %s", name)
+	return nil
+}
+
 func (m *Manager) MarkDirty(playlist string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

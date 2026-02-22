@@ -289,7 +289,7 @@ func (e *Executor) generateChannelName(job *Job, index int) string {
 }
 
 func (e *Executor) disableChannel(channelID string, job *Job) error {
-	channel, exists := e.channelStore.GetChannel(channelID)
+	_, exists := e.channelStore.GetChannel(channelID)
 	if !exists {
 		return nil // Channel doesn't exist locally, nothing to disable
 	}
@@ -299,11 +299,8 @@ func (e *Executor) disableChannel(channelID string, job *Job) error {
 		log.Printf("AutoSearch: Warning - failed to disable channel %s on IPTV provider: %v", channelID, err)
 	}
 
-	// Disable in local store
-	channel.Enabled = false
-	channel.ChannelNumber = 0
-	channel.DisabledAt = time.Now().Format(time.RFC3339)
-	return e.channelStore.SetChannel(channel)
+	// Remove from local store entirely (auto search channels are short-lived)
+	return e.channelStore.DeleteChannel(channelID)
 }
 
 func (e *Executor) handleJobFailure(job *Job, result ExecutionResult) {

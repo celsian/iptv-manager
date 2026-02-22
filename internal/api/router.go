@@ -60,6 +60,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /api/channels/groups", s.handleLocalGroupTitles)
 	mux.HandleFunc("GET /api/channels/next-number", s.handleNextChannelNumber)
 	mux.HandleFunc("GET /api/channels/check-conflict", s.handleCheckChannelConflict)
+	mux.HandleFunc("POST /api/channels/cleanup", s.handleCleanupChannels)
 
 	// Playlist management
 	mux.HandleFunc("GET /api/playlists/sources", s.handleGetPlaylistSources)

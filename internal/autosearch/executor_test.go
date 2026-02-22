@@ -288,13 +288,10 @@ func TestExecuteJobRemovesChannels(t *testing.T) {
 		t.Error("Channel should be disabled on IPTV provider")
 	}
 
-	// Check channel was disabled locally
-	ch1, _ := channelStore.GetChannel("ch1")
-	if ch1.Enabled {
-		t.Error("Channel should be disabled in local store")
-	}
-	if ch1.ChannelNumber != 0 {
-		t.Errorf("Disabled channel number = %d, want 0", ch1.ChannelNumber)
+	// Check channel was removed from local store
+	_, exists := channelStore.GetChannel("ch1")
+	if exists {
+		t.Error("Channel should be deleted from local store")
 	}
 }
 

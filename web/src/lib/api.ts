@@ -161,6 +161,9 @@ export const api = {
 
     checkConflict: (channelNumber: number, excludeId: string) =>
       request<{ conflict: boolean; affectedCount: number }>(`/channels/check-conflict?channelNumber=${channelNumber}&excludeId=${encodeURIComponent(excludeId)}`),
+
+    cleanup: () =>
+      request<{ removed: number; channels: { id: string; name: string }[] }>('/channels/cleanup', { method: 'POST' }),
   },
 
   // Playlist management
