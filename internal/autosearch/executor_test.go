@@ -283,8 +283,8 @@ func TestExecuteJobRemovesChannels(t *testing.T) {
 		t.Errorf("ChannelsRemoved = %d, want 1", result.ChannelsRemoved)
 	}
 
-	// Check channel was disabled on provider
-	if !provider.toggledOff["1"] {
+	// Check channel was disabled on provider (provider receives normalized "ch" prefix)
+	if !provider.toggledOff["ch1"] {
 		t.Error("Channel should be disabled on IPTV provider")
 	}
 
