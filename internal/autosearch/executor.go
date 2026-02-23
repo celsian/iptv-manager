@@ -143,6 +143,16 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 				log.Printf("AutoSearch: Job %s failed to refresh playlist: %v", job.Name, err)
 			} else {
 				log.Printf("AutoSearch: Job %s refreshed playlist %s", job.Name, playlistName)
+
+				// Sync stream URLs from the fresh M3U into channels.json
+				for _, id := range allManagedIDs {
+					if ch, ok := e.channelStore.GetChannel(id); ok {
+						if url, err := e.playlistManager.GetChannelURL(id, playlistName); err == nil && url != "" {
+							ch.URL = url
+							e.channelStore.SetChannel(ch)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -244,11 +254,6 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 				GroupTitle:    job.Playlist,
 				Enabled:       true,
 				Playlist:      job.Playlist,
-			}
-
-			// Try to get the stream URL
-			if url, err := e.iptvProvider.GetChannelURL(ch.ID); err == nil {
-				newChannel.URL = url
 			}
 
 			if err := e.channelStore.SetChannel(newChannel); err != nil {
