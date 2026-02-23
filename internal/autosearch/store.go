@@ -17,6 +17,7 @@ type Job struct {
 	Playlist          string   `json:"playlist"`
 	SearchTerm        string   `json:"searchTerm"`
 	FilterTerms       []string `json:"filterTerms,omitempty"`
+	FilterExpression  string   `json:"filterExpression,omitempty"`
 	StartingChannel   int      `json:"startingChannel"`
 	Schedule          string   `json:"schedule"`
 	Enabled           bool     `json:"enabled"`
@@ -24,6 +25,19 @@ type Job struct {
 	LastRunStatus     string   `json:"lastRunStatus,omitempty"`
 	LastRunMessage    string   `json:"lastRunMessage,omitempty"`
 	ManagedChannelIDs []string `json:"managedChannelIds"`
+}
+
+func copyJob(job *Job) *Job {
+	j := *job
+	if job.FilterTerms != nil {
+		j.FilterTerms = make([]string, len(job.FilterTerms))
+		copy(j.FilterTerms, job.FilterTerms)
+	}
+	if job.ManagedChannelIDs != nil {
+		j.ManagedChannelIDs = make([]string, len(job.ManagedChannelIDs))
+		copy(j.ManagedChannelIDs, job.ManagedChannelIDs)
+	}
+	return &j
 }
 
 type Store struct {
@@ -106,8 +120,7 @@ func (s *Store) GetJob(id string) (*Job, bool) {
 	if !ok {
 		return nil, false
 	}
-	jobCopy := *job
-	return &jobCopy, true
+	return copyJob(job), true
 }
 
 func (s *Store) GetAllJobs() []*Job {
@@ -116,8 +129,7 @@ func (s *Store) GetAllJobs() []*Job {
 
 	jobs := make([]*Job, 0, len(s.jobs))
 	for _, job := range s.jobs {
-		jobCopy := *job
-		jobs = append(jobs, &jobCopy)
+		jobs = append(jobs, copyJob(job))
 	}
 	return jobs
 }
@@ -129,8 +141,7 @@ func (s *Store) GetEnabledJobs() []*Job {
 	jobs := make([]*Job, 0)
 	for _, job := range s.jobs {
 		if job.Enabled {
-			jobCopy := *job
-			jobs = append(jobs, &jobCopy)
+			jobs = append(jobs, copyJob(job))
 		}
 	}
 	return jobs

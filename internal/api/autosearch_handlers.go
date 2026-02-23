@@ -59,6 +59,12 @@ func (s *Server) handleCreateAutoSearchJob(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleUpdateAutoSearchJob(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
+	existing, ok := s.autoSearchStore.GetJob(id)
+	if !ok {
+		http.Error(w, "Job not found", http.StatusNotFound)
+		return
+	}
+
 	var job autosearch.Job
 	if err := json.NewDecoder(r.Body).Decode(&job); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -66,6 +72,10 @@ func (s *Server) handleUpdateAutoSearchJob(w http.ResponseWriter, r *http.Reques
 	}
 
 	job.ID = id
+	job.ManagedChannelIDs = existing.ManagedChannelIDs
+	job.LastRun = existing.LastRun
+	job.LastRunStatus = existing.LastRunStatus
+	job.LastRunMessage = existing.LastRunMessage
 
 	if job.Name == "" || job.Playlist == "" || job.SearchTerm == "" || job.StartingChannel <= 0 {
 		http.Error(w, "Name, playlist, searchTerm, and startingChannel are required", http.StatusBadRequest)
@@ -102,22 +112,25 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Resolve IPTV provider playlist from local playlist name
+	iptvPlaylist := s.autoSearchExecutor.FindIPTVPlaylist(job.Playlist)
+
 	// Remove all channels managed by this job (both provider and local)
 	toggled := false
 	for _, channelID := range job.ManagedChannelIDs {
-		if err := s.iptvProvider.Toggle(job.Playlist, channelID, false); err != nil {
-			log.Printf("AutoSearch: Warning - failed to disable channel %s on provider during job deletion: %v", channelID, err)
-		} else {
-			toggled = true
+		if iptvPlaylist != "" {
+			if err := s.iptvProvider.Toggle(iptvPlaylist, channelID, false); err != nil {
+				log.Printf("AutoSearch: Warning - failed to disable channel %s on provider during job deletion: %v", channelID, err)
+			} else {
+				toggled = true
+			}
 		}
 		s.channelStore.DeleteChannel(channelID)
 	}
 
 	// Mark playlist dirty so Configure Channels refreshes the M3U
 	if toggled {
-		if playlistName := s.findLocalPlaylistName(job.Playlist); playlistName != "" {
-			s.playlistManager.MarkDirty(playlistName)
-		}
+		s.playlistManager.MarkDirty(job.Playlist)
 	}
 
 	if err := s.autoSearchStore.DeleteJob(id); err != nil {
@@ -147,9 +160,9 @@ func (s *Server) handleRunAutoSearchJob(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Playlist    string   `json:"playlist"`
-		SearchTerm  string   `json:"searchTerm"`
-		FilterTerms []string `json:"filterTerms"`
+		Playlist         string `json:"playlist"`
+		SearchTerm       string `json:"searchTerm"`
+		FilterExpression string `json:"filterExpression"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -163,9 +176,9 @@ func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Reque
 	}
 
 	job := &autosearch.Job{
-		Playlist:    req.Playlist,
-		SearchTerm:  req.SearchTerm,
-		FilterTerms: req.FilterTerms,
+		Playlist:         req.Playlist,
+		SearchTerm:       req.SearchTerm,
+		FilterExpression: req.FilterExpression,
 	}
 
 	if s.autoSearchExecutor == nil {
@@ -182,11 +195,4 @@ func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Reque
 	respondJSON(w, channels)
 }
 
-func (s *Server) findLocalPlaylistName(iptvPlaylist string) string {
-	for _, src := range s.playlistManager.GetPlaylistSources() {
-		if src.IPTVPlaylist == iptvPlaylist || (src.IPTVPlaylist == "" && src.Name == iptvPlaylist) {
-			return src.Name
-		}
-	}
-	return ""
-}
+
