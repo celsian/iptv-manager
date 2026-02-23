@@ -371,7 +371,7 @@ export function AutoSearch() {
           </div>
         ) : (
           <div className="divide-y divide-slate-700">
-            {jobs.map(job => (
+            {[...jobs].sort((a, b) => a.name.localeCompare(b.name)).map(job => (
               <div key={job.id} className="p-4 hover:bg-slate-700/30">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
