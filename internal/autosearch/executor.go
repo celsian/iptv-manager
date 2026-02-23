@@ -60,7 +60,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	result := ExecutionResult{Success: true}
 
 	// Resolve the IPTV provider playlist from the local playlist name
-	iptvPlaylist := e.findIPTVPlaylist(job.Playlist)
+	iptvPlaylist := e.FindIPTVPlaylist(job.Playlist)
 	if iptvPlaylist == "" {
 		iptvPlaylist = job.Playlist
 	}
@@ -329,7 +329,7 @@ func (e *Executor) handleJobFailure(job *Job, result ExecutionResult) {
 }
 
 func (e *Executor) PreviewJob(job *Job) ([]iptv.Channel, error) {
-	iptvPlaylist := e.findIPTVPlaylist(job.Playlist)
+	iptvPlaylist := e.FindIPTVPlaylist(job.Playlist)
 	if iptvPlaylist == "" {
 		iptvPlaylist = job.Playlist
 	}
@@ -349,8 +349,8 @@ func normalizeChannelID(id string) string {
 	return "ch" + id
 }
 
-// findIPTVPlaylist looks up the IPTV provider playlist for a local playlist name
-func (e *Executor) findIPTVPlaylist(localPlaylist string) string {
+// FindIPTVPlaylist looks up the IPTV provider playlist for a local playlist name.
+func (e *Executor) FindIPTVPlaylist(localPlaylist string) string {
 	if e.playlistManager == nil {
 		return ""
 	}

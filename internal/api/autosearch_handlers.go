@@ -113,7 +113,7 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Resolve IPTV provider playlist from local playlist name
-	iptvPlaylist := s.findIPTVPlaylist(job.Playlist)
+	iptvPlaylist := s.autoSearchExecutor.FindIPTVPlaylist(job.Playlist)
 
 	// Remove all channels managed by this job (both provider and local)
 	toggled := false
@@ -195,14 +195,4 @@ func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Reque
 	respondJSON(w, channels)
 }
 
-func (s *Server) findIPTVPlaylist(localPlaylist string) string {
-	for _, src := range s.playlistManager.GetPlaylistSources() {
-		if src.Name == localPlaylist {
-			if src.IPTVPlaylist != "" {
-				return src.IPTVPlaylist
-			}
-			return src.Name
-		}
-	}
-	return ""
-}
+
