@@ -79,31 +79,31 @@ func TestExecutorFilterChannels(t *testing.T) {
 	}
 
 	// No filter
-	filtered := executor.filterChannels(channels, nil)
+	filtered := executor.filterChannels(channels, &Job{})
 	if len(filtered) != 4 {
 		t.Errorf("No filter: got %d channels, want 4", len(filtered))
 	}
 
 	// Single filter for Football
-	filtered = executor.filterChannels(channels, []string{"Football"})
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Football"})
 	if len(filtered) != 2 {
 		t.Errorf("Football filter: got %d channels, want 2", len(filtered))
 	}
 
 	// Filter is case-insensitive
-	filtered = executor.filterChannels(channels, []string{"football"})
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "football"})
 	if len(filtered) != 2 {
 		t.Errorf("Case-insensitive filter: got %d channels, want 2", len(filtered))
 	}
 
 	// Filter with no matches
-	filtered = executor.filterChannels(channels, []string{"Tennis"})
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Tennis"})
 	if len(filtered) != 0 {
 		t.Errorf("No match filter: got %d channels, want 0", len(filtered))
 	}
 
-	// Multiple filters with AND logic
-	filtered = executor.filterChannels(channels, []string{"Michigan", "Football"})
+	// AND logic
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Michigan AND Football"})
 	if len(filtered) != 1 {
 		t.Errorf("AND filter (Michigan + Football): got %d channels, want 1", len(filtered))
 	}
@@ -111,16 +111,34 @@ func TestExecutorFilterChannels(t *testing.T) {
 		t.Errorf("AND filter: got channel %s, want 1", filtered[0].ID)
 	}
 
-	// Multiple filters where no channel matches all
-	filtered = executor.filterChannels(channels, []string{"Michigan", "Tennis"})
+	// AND where no channel matches all
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Michigan AND Tennis"})
 	if len(filtered) != 0 {
 		t.Errorf("AND filter no match: got %d channels, want 0", len(filtered))
 	}
 
-	// Empty filter terms slice
-	filtered = executor.filterChannels(channels, []string{})
-	if len(filtered) != 4 {
-		t.Errorf("Empty filter slice: got %d channels, want 4", len(filtered))
+	// OR logic
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Football OR Hockey"})
+	if len(filtered) != 3 {
+		t.Errorf("OR filter: got %d channels, want 3", len(filtered))
+	}
+
+	// NOT logic
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "Michigan !Football"})
+	if len(filtered) != 2 {
+		t.Errorf("NOT filter: got %d channels, want 2", len(filtered))
+	}
+
+	// Complex expression
+	filtered = executor.filterChannels(channels, &Job{FilterExpression: "(Football OR Hockey) AND !Michigan"})
+	if len(filtered) != 1 {
+		t.Errorf("Complex filter: got %d channels, want 1", len(filtered))
+	}
+
+	// Backward compat: filterTerms without filterExpression
+	filtered = executor.filterChannels(channels, &Job{FilterTerms: []string{"Football"}})
+	if len(filtered) != 2 {
+		t.Errorf("Legacy filterTerms: got %d channels, want 2", len(filtered))
 	}
 }
 
@@ -553,9 +571,10 @@ func TestExecuteJobSyncsURLsFromM3U(t *testing.T) {
 	executor := NewExecutor(store, channelStore, provider, playlistManager, nil, "")
 	executor.providerDelay = 0
 
+	// job.Playlist is the local playlist name; executor resolves "Sports" via config
 	job := &Job{
 		Name:            "Test Job",
-		Playlist:        "Sports",
+		Playlist:        "TestPlaylist",
 		SearchTerm:      "test",
 		StartingChannel: 500,
 		Enabled:         true,

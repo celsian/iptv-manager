@@ -1,5 +1,5 @@
-import { useState, useEffect, type KeyboardEvent } from 'react';
-import { Loader2, Plus, Play, Pencil, Trash2, Clock, CheckCircle, XCircle, AlertCircle, Eye, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, Plus, Play, Pencil, Trash2, Clock, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react';
 import cronstrue from 'cronstrue';
 import { api, type AutoSearchJob, type AutoSearchExecutionResult, type IPTVChannel } from '../lib/api';
 
@@ -24,7 +24,7 @@ function isMoreThanOnceDaily(expression: string): boolean {
 
 export function AutoSearch() {
   const [jobs, setJobs] = useState<AutoSearchJob[]>([]);
-  const [iptvPlaylists, setIptvPlaylists] = useState<string[]>([]);
+  const [playlistSources, setPlaylistSources] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingJob, setEditingJob] = useState<AutoSearchJob | null>(null);
@@ -37,16 +37,15 @@ export function AutoSearch() {
     name: '',
     playlist: '',
     searchTerm: '',
-    filterTerms: [] as string[],
+    filterExpression: '',
     startingChannel: 1000,
     schedule: '0 6 * * *',
     enabled: true,
   });
-  const [filterInput, setFilterInput] = useState('');
 
   useEffect(() => {
     loadJobs();
-    loadIptvPlaylists();
+    loadPlaylistSources();
   }, []);
 
   const loadJobs = async () => {
@@ -60,26 +59,25 @@ export function AutoSearch() {
     }
   };
 
-  const loadIptvPlaylists = async () => {
+  const loadPlaylistSources = async () => {
     try {
-      const data = await api.iptv.playlists();
-      setIptvPlaylists(data || []);
+      const data = await api.playlists.sources();
+      setPlaylistSources((data || []).map(s => s.name));
     } catch (err) {
-      console.error('Failed to load IPTV playlists:', err);
+      console.error('Failed to load playlist sources:', err);
     }
   };
 
   const handleCreate = () => {
     setFormData({
       name: '',
-      playlist: iptvPlaylists[0] || '',
+      playlist: playlistSources[0] || '',
       searchTerm: '',
-      filterTerms: [],
+      filterExpression: '',
       startingChannel: 1000,
       schedule: '0 6 * * *',
       enabled: true,
     });
-    setFilterInput('');
     setIsCreating(true);
     setEditingJob(null);
     setPreviewChannels(null);
@@ -90,12 +88,11 @@ export function AutoSearch() {
       name: job.name,
       playlist: job.playlist,
       searchTerm: job.searchTerm,
-      filterTerms: job.filterTerms || [],
+      filterExpression: job.filterExpression || (job.filterTerms || []).join(' AND '),
       startingChannel: job.startingChannel,
       schedule: job.schedule,
       enabled: job.enabled,
     });
-    setFilterInput('');
     setEditingJob(job);
     setIsCreating(false);
     setPreviewChannels(null);
@@ -153,7 +150,7 @@ export function AutoSearch() {
       const channels = await api.autoSearch.preview(
         formData.playlist,
         formData.searchTerm,
-        formData.filterTerms.length > 0 ? formData.filterTerms : undefined
+        formData.filterExpression || undefined
       );
       setPreviewChannels(channels);
     } catch (err) {
@@ -224,7 +221,7 @@ export function AutoSearch() {
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
               >
                 <option value="">Select playlist...</option>
-                {iptvPlaylists.map(p => (
+                {playlistSources.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -240,42 +237,15 @@ export function AutoSearch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Filter Terms (optional)</label>
-              <div className="flex flex-wrap gap-1.5 p-2 bg-slate-700 border border-slate-600 rounded-lg min-h-[42px]">
-                {formData.filterTerms.map((term, i) => (
-                  <span key={i} className="flex items-center gap-1 px-2 py-0.5 bg-blue-600/30 border border-blue-500/50 text-blue-300 text-sm rounded">
-                    {term}
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, filterTerms: formData.filterTerms.filter((_, j) => j !== i) })}
-                      className="hover:text-white"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  type="text"
-                  value={filterInput}
-                  onChange={e => setFilterInput(e.target.value)}
-                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-                    if ((e.key === 'Enter' || e.key === ',') && filterInput.trim()) {
-                      e.preventDefault();
-                      const term = filterInput.trim().replace(/,$/,'');
-                      if (term && !formData.filterTerms.includes(term)) {
-                        setFormData({ ...formData, filterTerms: [...formData.filterTerms, term] });
-                      }
-                      setFilterInput('');
-                    }
-                    if (e.key === 'Backspace' && !filterInput && formData.filterTerms.length > 0) {
-                      setFormData({ ...formData, filterTerms: formData.filterTerms.slice(0, -1) });
-                    }
-                  }}
-                  placeholder={formData.filterTerms.length === 0 ? 'Type and press Enter...' : ''}
-                  className="flex-1 min-w-[120px] bg-transparent text-white placeholder-slate-400 outline-none text-sm"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Channel must match ALL terms. Press Enter to add.</p>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Filter Expression (optional)</label>
+              <input
+                type="text"
+                value={formData.filterExpression}
+                onChange={e => setFormData({ ...formData, filterExpression: e.target.value })}
+                placeholder="e.g. NCAA AND (Basketball OR BBall) AND !State"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">Supports AND, OR, NOT (!), and parentheses. Terms without operators default to AND.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">Starting Channel Number</label>
@@ -417,10 +387,10 @@ export function AutoSearch() {
                         <span className="text-slate-500">Playlist:</span> {job.playlist}
                         {' | '}
                         <span className="text-slate-500">Search:</span> {job.searchTerm}
-                        {job.filterTerms && job.filterTerms.length > 0 && (
+                        {(job.filterExpression || (job.filterTerms && job.filterTerms.length > 0)) && (
                           <>
                             {' | '}
-                            <span className="text-slate-500">Filter:</span> {job.filterTerms.join(', ')}
+                            <span className="text-slate-500">Filter:</span> {job.filterExpression || job.filterTerms?.join(' AND ')}
                           </>
                         )}
                       </p>

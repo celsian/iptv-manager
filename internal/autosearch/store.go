@@ -17,6 +17,7 @@ type Job struct {
 	Playlist          string   `json:"playlist"`
 	SearchTerm        string   `json:"searchTerm"`
 	FilterTerms       []string `json:"filterTerms,omitempty"`
+	FilterExpression  string   `json:"filterExpression,omitempty"`
 	StartingChannel   int      `json:"startingChannel"`
 	Schedule          string   `json:"schedule"`
 	Enabled           bool     `json:"enabled"`

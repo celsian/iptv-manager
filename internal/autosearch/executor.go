@@ -59,8 +59,14 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 
 	result := ExecutionResult{Success: true}
 
+	// Resolve the IPTV provider playlist from the local playlist name
+	iptvPlaylist := e.findIPTVPlaylist(job.Playlist)
+	if iptvPlaylist == "" {
+		iptvPlaylist = job.Playlist
+	}
+
 	// Search IPTV provider
-	searchResults, err := e.iptvProvider.Search(job.Playlist, job.SearchTerm)
+	searchResults, err := e.iptvProvider.Search(iptvPlaylist, job.SearchTerm)
 	if err != nil {
 		result.Success = false
 		result.Message = fmt.Sprintf("Failed to search IPTV provider: %v", err)
@@ -69,7 +75,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	}
 
 	// Filter results if filter terms are provided
-	matchedChannels := e.filterChannels(searchResults, job.FilterTerms)
+	matchedChannels := e.filterChannels(searchResults, job)
 
 	log.Printf("AutoSearch: Job %s found %d channels matching criteria", job.Name, len(matchedChannels))
 
@@ -105,7 +111,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	// Remove channels that no longer match
 	for _, id := range channelsToRemove {
 		normalizedID := normalizeChannelID(id)
-		if err := e.disableChannel(normalizedID, job); err != nil {
+		if err := e.disableChannel(normalizedID, iptvPlaylist); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("Failed to disable channel %s: %v", id, err))
 		} else {
 			result.ChannelsRemoved++
@@ -116,7 +122,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	// Enable channels on IPTV provider that aren't already enabled
 	for _, ch := range channelsToAdd {
 		if !ch.Enabled {
-			if err := e.iptvProvider.Toggle(job.Playlist, ch.ID, true); err != nil {
+			if err := e.iptvProvider.Toggle(iptvPlaylist, ch.ID, true); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("Failed to enable channel %s on IPTV: %v", ch.ID, err))
 			}
 		}
@@ -137,20 +143,18 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 
 	// Refresh the playlist to get updated M3U reflecting all enable/disable changes
 	if e.playlistManager != nil {
-		if playlistName := e.findLocalPlaylistName(job.Playlist); playlistName != "" {
-			if err := e.playlistManager.UpdatePlaylist(playlistName); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("Failed to refresh playlist: %v", err))
-				log.Printf("AutoSearch: Job %s failed to refresh playlist: %v", job.Name, err)
-			} else {
-				log.Printf("AutoSearch: Job %s refreshed playlist %s", job.Name, playlistName)
+		if err := e.playlistManager.UpdatePlaylist(job.Playlist); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("Failed to refresh playlist: %v", err))
+			log.Printf("AutoSearch: Job %s failed to refresh playlist: %v", job.Name, err)
+		} else {
+			log.Printf("AutoSearch: Job %s refreshed playlist %s", job.Name, job.Playlist)
 
-				// Sync stream URLs from the fresh M3U into channels.json
-				for _, id := range allManagedIDs {
-					if ch, ok := e.channelStore.GetChannel(id); ok {
-						if url, err := e.playlistManager.GetChannelURL(id, playlistName); err == nil && url != "" {
-							ch.URL = url
-							e.channelStore.SetChannel(ch)
-						}
+			// Sync stream URLs from the fresh M3U into channels.json
+			for _, id := range allManagedIDs {
+				if ch, ok := e.channelStore.GetChannel(id); ok {
+					if url, err := e.playlistManager.GetChannelURL(id, job.Playlist); err == nil && url != "" {
+						ch.URL = url
+						e.channelStore.SetChannel(ch)
 					}
 				}
 			}
@@ -182,22 +186,24 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	return result
 }
 
-func (e *Executor) filterChannels(channels []iptv.Channel, filterTerms []string) []iptv.Channel {
-	if len(filterTerms) == 0 {
+func (e *Executor) filterChannels(channels []iptv.Channel, job *Job) []iptv.Channel {
+	expr := job.FilterExpression
+	if expr == "" && len(job.FilterTerms) > 0 {
+		expr = strings.Join(job.FilterTerms, " AND ")
+	}
+	if expr == "" {
+		return channels
+	}
+
+	node, err := ParseFilterExpression(expr)
+	if err != nil {
+		log.Printf("AutoSearch: Job %s invalid filter expression %q: %v", job.Name, expr, err)
 		return channels
 	}
 
 	var filtered []iptv.Channel
 	for _, ch := range channels {
-		titleLower := strings.ToLower(ch.Title)
-		matchesAll := true
-		for _, term := range filterTerms {
-			if !strings.Contains(titleLower, strings.ToLower(term)) {
-				matchesAll = false
-				break
-			}
-		}
-		if matchesAll {
+		if MatchFilter(node, ch.Title) {
 			filtered = append(filtered, ch)
 		}
 	}
@@ -293,14 +299,14 @@ func (e *Executor) generateChannelName(job *Job, index int) string {
 	return fmt.Sprintf("%s %d", job.Name, index)
 }
 
-func (e *Executor) disableChannel(channelID string, job *Job) error {
+func (e *Executor) disableChannel(channelID string, iptvPlaylist string) error {
 	_, exists := e.channelStore.GetChannel(channelID)
 	if !exists {
 		return nil // Channel doesn't exist locally, nothing to disable
 	}
 
 	// Disable on IPTV provider (provider normalizes the ID internally)
-	if err := e.iptvProvider.Toggle(job.Playlist, channelID, false); err != nil {
+	if err := e.iptvProvider.Toggle(iptvPlaylist, channelID, false); err != nil {
 		log.Printf("AutoSearch: Warning - failed to disable channel %s on IPTV provider: %v", channelID, err)
 	}
 
@@ -323,12 +329,17 @@ func (e *Executor) handleJobFailure(job *Job, result ExecutionResult) {
 }
 
 func (e *Executor) PreviewJob(job *Job) ([]iptv.Channel, error) {
-	searchResults, err := e.iptvProvider.Search(job.Playlist, job.SearchTerm)
+	iptvPlaylist := e.findIPTVPlaylist(job.Playlist)
+	if iptvPlaylist == "" {
+		iptvPlaylist = job.Playlist
+	}
+
+	searchResults, err := e.iptvProvider.Search(iptvPlaylist, job.SearchTerm)
 	if err != nil {
 		return nil, err
 	}
 
-	return e.filterChannels(searchResults, job.FilterTerms), nil
+	return e.filterChannels(searchResults, job), nil
 }
 
 func normalizeChannelID(id string) string {
@@ -338,16 +349,18 @@ func normalizeChannelID(id string) string {
 	return "ch" + id
 }
 
-// findLocalPlaylistName finds the local playlist name that uses the given IPTV playlist
-func (e *Executor) findLocalPlaylistName(iptvPlaylist string) string {
+// findIPTVPlaylist looks up the IPTV provider playlist for a local playlist name
+func (e *Executor) findIPTVPlaylist(localPlaylist string) string {
 	if e.playlistManager == nil {
 		return ""
 	}
 
 	sources := e.playlistManager.GetPlaylistSources()
 	for _, src := range sources {
-		// Check if IPTVPlaylist matches, or if the name matches (for playlists without explicit IPTV mapping)
-		if src.IPTVPlaylist == iptvPlaylist || (src.IPTVPlaylist == "" && src.Name == iptvPlaylist) {
+		if src.Name == localPlaylist {
+			if src.IPTVPlaylist != "" {
+				return src.IPTVPlaylist
+			}
 			return src.Name
 		}
 	}

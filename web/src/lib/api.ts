@@ -57,6 +57,7 @@ export interface AutoSearchJob {
   playlist: string;
   searchTerm: string;
   filterTerms?: string[];
+  filterExpression?: string;
   startingChannel: number;
   schedule: string;
   enabled: boolean;
@@ -265,10 +266,10 @@ export const api = {
         method: 'POST',
       }),
 
-    preview: (playlist: string, searchTerm: string, filterTerms?: string[]) =>
+    preview: (playlist: string, searchTerm: string, filterExpression?: string) =>
       request<IPTVChannel[]>('/autosearch/preview', {
         method: 'POST',
-        body: JSON.stringify({ playlist, searchTerm, filterTerms }),
+        body: JSON.stringify({ playlist, searchTerm, filterExpression }),
       }),
   },
 };
