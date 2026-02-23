@@ -8,8 +8,17 @@ A web-based IPTV channel management tool for xTeVe and Emby.
 - Preview channel streams in browser (HLS.js)
 - Enable/disable channels per playlist
 - Configure xTeVe channel mappings with nearby channel visibility
+- Multi-playlist support with deep linking routes
 - Playlist-to-group-title auto-mapping
 - Trigger Emby guide refresh
+- Discord notifications on failures
+- Automated channel search and management via scheduled cron jobs
+  - Boolean filter expressions (AND, OR, NOT, parentheses)
+  - Preview matching channels before saving
+  - Automatic channel numbering with conflict avoidance
+  - Managed channel tracking with automatic cleanup on job deletion
+- Stale channel cleanup (Settings > Maintenance)
+- Playlist deletion with automatic channel cleanup
 - File-based configuration (no database)
 
 ## Quick Start
