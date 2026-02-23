@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Play, Settings2, Tv, PowerOff, Copy, Check } from 'lucide-react';
+import { Loader2, Play, Settings2, Tv, PowerOff, Copy, Check } from 'lucide-react';
 import { api, type PlaylistChannel, type IPTVChannel, type PlaylistSource } from '../lib/api';
 import { copyToClipboard } from '../lib/clipboard';
 import { StreamPreview } from './StreamPreview';
@@ -256,15 +256,6 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={() => selectedPlaylist === '__all__' ? loadAllPlaylistChannels() : loadPlaylistChannels()}
-            disabled={loading || !selectedPlaylist}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-
           <button
             onClick={handleRefreshEmby}
             disabled={refreshingEmby}
