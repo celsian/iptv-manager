@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/celsian/iptv-manager/internal/autosearch"
@@ -101,9 +102,22 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Remove all channels managed by this job
+	// Remove all channels managed by this job (both provider and local)
+	toggled := false
 	for _, channelID := range job.ManagedChannelIDs {
+		if err := s.iptvProvider.Toggle(job.Playlist, channelID, false); err != nil {
+			log.Printf("AutoSearch: Warning - failed to disable channel %s on provider during job deletion: %v", channelID, err)
+		} else {
+			toggled = true
+		}
 		s.channelStore.DeleteChannel(channelID)
+	}
+
+	// Mark playlist dirty so Configure Channels refreshes the M3U
+	if toggled {
+		if playlistName := s.findLocalPlaylistName(job.Playlist); playlistName != "" {
+			s.playlistManager.MarkDirty(playlistName)
+		}
 	}
 
 	if err := s.autoSearchStore.DeleteJob(id); err != nil {
@@ -166,4 +180,13 @@ func (s *Server) handlePreviewAutoSearchJob(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondJSON(w, channels)
+}
+
+func (s *Server) findLocalPlaylistName(iptvPlaylist string) string {
+	for _, src := range s.playlistManager.GetPlaylistSources() {
+		if src.IPTVPlaylist == iptvPlaylist || (src.IPTVPlaylist == "" && src.Name == iptvPlaylist) {
+			return src.Name
+		}
+	}
+	return ""
 }

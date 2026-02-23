@@ -25,9 +25,6 @@ type Provider interface {
 	// Toggle enables or disables a channel on the provider
 	Toggle(playlist, channelID string, enable bool) error
 
-	// GetChannelURL returns the stream URL for a channel
-	GetChannelURL(channelID string) (string, error)
-
 	// GetEnabledChannels returns all enabled channels in a playlist
 	GetEnabledChannels(playlist string) ([]Channel, error)
 }

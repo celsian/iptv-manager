@@ -137,45 +137,6 @@ func (p *IPTorrentsProvider) Toggle(playlist, channelID string, enable bool) err
 	return err
 }
 
-func (p *IPTorrentsProvider) GetChannelURL(channelID string) (string, error) {
-	cfg := p.cfg.Get()
-	baseURL := strings.TrimSuffix(cfg.IPTV.APIAddress, "/stalker_portal/server/load.php")
-	streamURL := fmt.Sprintf("%s/stalker_portal/streaming/", baseURL)
-
-	data := url.Values{
-		"jxt": {"5"},
-		"jxw": {"play"},
-		"c":   {normalizeID(channelID)},
-	}
-
-	req, err := http.NewRequest("POST", cfg.IPTV.APIAddress, strings.NewReader(data.Encode()))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Cookie", fmt.Sprintf("uid=%s; pass=%s", cfg.IPTV.UID, cfg.IPTV.Pass))
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var jsonBody map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&jsonBody); err != nil {
-		return "", err
-	}
-
-	if cmd, ok := jsonBody["cmd"].(string); ok {
-		if strings.HasPrefix(cmd, "http") {
-			return cmd, nil
-		}
-		return streamURL + cmd, nil
-	}
-
-	return "", fmt.Errorf("unable to get stream URL")
-}
-
 func (p *IPTorrentsProvider) requestJSON(data url.Values) (map[string]interface{}, error) {
 	cfg := p.cfg.Get()
 

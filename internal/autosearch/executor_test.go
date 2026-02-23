@@ -1,11 +1,18 @@
 package autosearch
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/celsian/iptv-manager/internal/channels"
+	"github.com/celsian/iptv-manager/internal/config"
 	"github.com/celsian/iptv-manager/internal/iptv"
+	"github.com/celsian/iptv-manager/internal/playlists"
 )
 
 type mockIPTVProvider struct {
@@ -13,7 +20,6 @@ type mockIPTVProvider struct {
 	enabledChannels map[string][]iptv.Channel
 	toggledOn       map[string]bool
 	toggledOff      map[string]bool
-	channelURLs     map[string]string
 }
 
 func newMockIPTVProvider() *mockIPTVProvider {
@@ -22,7 +28,6 @@ func newMockIPTVProvider() *mockIPTVProvider {
 		enabledChannels: make(map[string][]iptv.Channel),
 		toggledOn:       make(map[string]bool),
 		toggledOff:      make(map[string]bool),
-		channelURLs:     make(map[string]string),
 	}
 }
 
@@ -46,13 +51,6 @@ func (m *mockIPTVProvider) Toggle(playlist, channelID string, enable bool) error
 
 func (m *mockIPTVProvider) GetPlaylists() ([]string, error) {
 	return []string{"Sports", "News"}, nil
-}
-
-func (m *mockIPTVProvider) GetChannelURL(channelID string) (string, error) {
-	if url, ok := m.channelURLs[channelID]; ok {
-		return url, nil
-	}
-	return "http://example.com/stream/" + channelID, nil
 }
 
 func (m *mockIPTVProvider) GetEnabledChannels(playlist string) ([]iptv.Channel, error) {
@@ -512,5 +510,77 @@ func TestNormalizeChannelID(t *testing.T) {
 				t.Errorf("normalizeChannelID(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestExecuteJobSyncsURLsFromM3U(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Serve a fake M3U with stream URLs
+	m3u := "#EXTM3U\n" +
+		"#EXTINF:-1 tvg-id=\"ch100\",Channel 100\n" +
+		"http://streams.example.com/live/100\n" +
+		"#EXTINF:-1 tvg-id=\"ch200\",Channel 200\n" +
+		"http://streams.example.com/live/200\n"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, m3u)
+	}))
+	defer ts.Close()
+
+	// Set up config with a playlist source pointing at the test server
+	cfgPath := filepath.Join(tmpDir, "config.json")
+	cfg := config.Config{
+		PlaylistSources: []config.PlaylistSource{
+			{Name: "TestPlaylist", URL: ts.URL, IPTVPlaylist: "Sports"},
+		},
+	}
+	data, _ := json.Marshal(cfg)
+	os.WriteFile(cfgPath, data, 0644)
+
+	cfgManager, _ := config.NewManager(cfgPath)
+	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
+	playlistManager := playlists.NewManager(cfgManager, channelStore, tmpDir)
+	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
+
+	provider := newMockIPTVProvider()
+	provider.searchResults["Sports:test"] = []iptv.Channel{
+		{ID: "100", Title: "Channel 100", Enabled: false},
+		{ID: "200", Title: "Channel 200", Enabled: false},
+	}
+
+	os.MkdirAll(filepath.Join(tmpDir, "playlists"), 0755)
+
+	executor := NewExecutor(store, channelStore, provider, playlistManager, nil, "")
+	executor.providerDelay = 0
+
+	job := &Job{
+		Name:            "Test Job",
+		Playlist:        "Sports",
+		SearchTerm:      "test",
+		StartingChannel: 500,
+		Enabled:         true,
+	}
+	store.CreateJob(job)
+
+	result := executor.ExecuteJob(job.ID)
+	if !result.Success {
+		t.Fatalf("ExecuteJob failed: %s (errors: %v)", result.Message, result.Errors)
+	}
+
+	// Verify URLs were synced from the M3U
+	ch100, ok := channelStore.GetChannel("ch100")
+	if !ok {
+		t.Fatal("ch100 should exist in channel store")
+	}
+	if ch100.URL != "http://streams.example.com/live/100" {
+		t.Errorf("ch100.URL = %q, want %q", ch100.URL, "http://streams.example.com/live/100")
+	}
+
+	ch200, ok := channelStore.GetChannel("ch200")
+	if !ok {
+		t.Fatal("ch200 should exist in channel store")
+	}
+	if ch200.URL != "http://streams.example.com/live/200" {
+		t.Errorf("ch200.URL = %q, want %q", ch200.URL, "http://streams.example.com/live/200")
 	}
 }

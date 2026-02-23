@@ -203,68 +203,6 @@ func TestToggle(t *testing.T) {
 	}
 }
 
-func TestGetChannelURL(t *testing.T) {
-	jsonResp := map[string]interface{}{
-		"cmd": "12345/stream.m3u8",
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(jsonResp)
-	}))
-	defer server.Close()
-
-	// The server URL will be something like http://127.0.0.1:xxxxx
-	// We need to configure it as if it were the API endpoint
-	tmpDir := t.TempDir()
-	cfgPath := filepath.Join(tmpDir, "config.json")
-
-	cfg := config.Config{
-		IPTV: config.IPTVConfig{
-			APIAddress: server.URL + "/stalker_portal/server/load.php",
-			UID:        "testuid",
-			Pass:       "testpass",
-		},
-	}
-	data, _ := json.Marshal(cfg)
-	os.WriteFile(cfgPath, data, 0644)
-
-	cfgManager, _ := config.NewManager(cfgPath)
-	provider := NewIPTorrentsProvider(cfgManager)
-
-	url, err := provider.GetChannelURL("12345")
-	if err != nil {
-		t.Fatalf("GetChannelURL failed: %v", err)
-	}
-
-	// Should construct full URL from base + streaming path + cmd
-	if url == "" {
-		t.Error("URL should not be empty")
-	}
-}
-
-func TestGetChannelURLFullHTTP(t *testing.T) {
-	// When cmd is already a full URL
-	jsonResp := map[string]interface{}{
-		"cmd": "http://stream.example.com/12345/stream.m3u8",
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(jsonResp)
-	}))
-	defer server.Close()
-
-	provider := setupTestProvider(t, server.URL)
-
-	url, err := provider.GetChannelURL("12345")
-	if err != nil {
-		t.Fatalf("GetChannelURL failed: %v", err)
-	}
-
-	if url != "http://stream.example.com/12345/stream.m3u8" {
-		t.Errorf("URL = %q, want full http URL", url)
-	}
-}
-
 func TestGetEnabledChannels(t *testing.T) {
 	html := `<ul>
 		<li>
