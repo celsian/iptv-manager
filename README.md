@@ -7,11 +7,10 @@ A web-based IPTV channel management tool for xTeVe and Emby.
 - Search IPTV channels by playlist
 - Preview channel streams in browser (HLS.js)
 - Enable/disable channels per playlist
-- Configure xTeVe channel mappings with nearby channel visibility
+- Configure channel mappings with nearby channel visibility
 - Multi-playlist support with deep linking routes
 - Playlist-to-group-title auto-mapping
 - Trigger Emby guide refresh
-- Discord notifications on failures
 - Automated channel search and management via scheduled cron jobs
   - Boolean filter expressions (AND, OR, NOT, parentheses)
   - Preview matching channels before saving
@@ -19,6 +18,7 @@ A web-based IPTV channel management tool for xTeVe and Emby.
   - Managed channel tracking with automatic cleanup on job deletion
 - Stale channel cleanup (Settings > Maintenance)
 - Playlist deletion with automatic channel cleanup
+- Discord notifications on failures
 - File-based configuration (no database)
 
 ## Quick Start
@@ -55,9 +55,6 @@ Settings can be configured via the web UI Settings page, or by editing `config.j
     "apiAddress": "https://your-provider/stalker_portal/server/load.php",
     "uid": "your-uid",
     "pass": "your-password"
-  },
-  "xteve": {
-    "websocketAddress": "ws://localhost:34400/data/"
   },
   "emby": {
     "apiAddress": "http://localhost:8096",
