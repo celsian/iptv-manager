@@ -56,9 +56,6 @@ Settings can be configured via the web UI Settings page, or by editing `config.j
     "uid": "your-uid",
     "pass": "your-password"
   },
-  "xteve": {
-    "websocketAddress": "ws://localhost:34400/data/"
-  },
   "emby": {
     "apiAddress": "http://localhost:8096",
     "apiKey": "your-api-key"
