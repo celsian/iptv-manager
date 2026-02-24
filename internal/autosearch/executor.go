@@ -232,7 +232,7 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 		}
 
 		// Generate channel name
-		channelName := e.generateChannelName(job, channelIndex)
+		channelName := e.generateChannelName(job, channelIndex, ch.Title)
 
 		// Check if channel already exists in local store
 		existingChannel, exists := e.channelStore.GetChannel(normalizedID)
@@ -295,7 +295,10 @@ func (e *Executor) getOccupiedChannelNumbers(excludeIDs []string) map[int]bool {
 	return occupied
 }
 
-func (e *Executor) generateChannelName(job *Job, index int) string {
+func (e *Executor) generateChannelName(job *Job, index int, providerTitle string) string {
+	if job.UseProviderName {
+		return providerTitle
+	}
 	return fmt.Sprintf("%s %d", job.Name, index)
 }
 

@@ -59,6 +59,7 @@ export interface AutoSearchJob {
   filterTerms?: string[];
   filterExpression?: string;
   startingChannel: number;
+  useProviderName?: boolean;
   schedule: string;
   enabled: boolean;
   lastRun?: string;

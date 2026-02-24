@@ -151,15 +151,21 @@ func TestExecutorGenerateChannelName(t *testing.T) {
 	executor := newTestExecutor(store, channelStore, provider)
 
 	job := &Job{Name: "Michigan Football", SearchTerm: "Michigan", FilterTerms: []string{"Football"}}
-	name := executor.generateChannelName(job, 1)
+	name := executor.generateChannelName(job, 1, "Michigan vs OSU")
 	if name != "Michigan Football 1" {
 		t.Errorf("got %q, want %q", name, "Michigan Football 1")
 	}
 
 	job = &Job{Name: "Sports Bundle", SearchTerm: "Michigan"}
-	name = executor.generateChannelName(job, 5)
+	name = executor.generateChannelName(job, 5, "Michigan Hockey")
 	if name != "Sports Bundle 5" {
 		t.Errorf("got %q, want %q", name, "Sports Bundle 5")
+	}
+
+	job = &Job{Name: "Sports Bundle", SearchTerm: "Michigan", UseProviderName: true}
+	name = executor.generateChannelName(job, 1, "Michigan vs OSU Basketball")
+	if name != "Michigan vs OSU Basketball" {
+		t.Errorf("got %q, want %q", name, "Michigan vs OSU Basketball")
 	}
 }
 
