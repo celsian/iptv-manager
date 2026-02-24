@@ -50,7 +50,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /api/iptv/toggle", s.handleChannelToggle)
 	mux.HandleFunc("GET /api/iptv/playlists", s.handleGetPlaylists)
 
-	// Local channel management (replaces xTeVe)
+	// Local channel management
 	mux.HandleFunc("GET /api/channels", s.handleLocalChannels)
 	mux.HandleFunc("GET /api/channels/enabled", s.handleLocalEnabled)
 	mux.HandleFunc("GET /api/channels/{iptvId}", s.handleLocalChannelGet)
