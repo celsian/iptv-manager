@@ -19,6 +19,7 @@ type Job struct {
 	FilterTerms       []string `json:"filterTerms,omitempty"`
 	FilterExpression  string   `json:"filterExpression,omitempty"`
 	StartingChannel   int      `json:"startingChannel"`
+	UseProviderName   bool     `json:"useProviderName,omitempty"`
 	Schedule          string   `json:"schedule"`
 	Enabled           bool     `json:"enabled"`
 	LastRun           string   `json:"lastRun,omitempty"`

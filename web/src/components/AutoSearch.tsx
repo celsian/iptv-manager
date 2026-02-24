@@ -39,6 +39,7 @@ export function AutoSearch() {
     searchTerm: '',
     filterExpression: '',
     startingChannel: 1000,
+    useProviderName: false,
     schedule: '0 6 * * *',
     enabled: true,
   });
@@ -75,6 +76,7 @@ export function AutoSearch() {
       searchTerm: '',
       filterExpression: '',
       startingChannel: 1000,
+      useProviderName: false,
       schedule: '0 6 * * *',
       enabled: true,
     });
@@ -90,6 +92,7 @@ export function AutoSearch() {
       searchTerm: job.searchTerm,
       filterExpression: job.filterExpression || (job.filterTerms || []).join(' AND '),
       startingChannel: job.startingChannel,
+      useProviderName: job.useProviderName || false,
       schedule: job.schedule,
       enabled: job.enabled,
     });
@@ -287,6 +290,16 @@ export function AutoSearch() {
               />
               <label htmlFor="enabled" className="text-sm text-slate-300">Enabled</label>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="useProviderName"
+                checked={formData.useProviderName}
+                onChange={e => setFormData({ ...formData, useProviderName: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
+              />
+              <label htmlFor="useProviderName" className="text-sm text-slate-300">Use provider channel names</label>
+            </div>
           </div>
 
           {/* Preview Section */}
@@ -321,7 +334,7 @@ export function AutoSearch() {
                       <tr key={ch.id} className="border-b border-slate-800">
                         <td className="py-1 pr-3 text-blue-400 font-mono">{formData.startingChannel + idx}</td>
                         <td className="py-1 pr-3 text-white">
-                          {formData.name ? `${formData.name} ${idx + 1}` : `Channel ${idx + 1}`}
+                          {formData.useProviderName ? ch.title : (formData.name ? `${formData.name} ${idx + 1}` : `Channel ${idx + 1}`)}
                         </td>
                         <td className="py-1 text-slate-400">{ch.title}</td>
                       </tr>
