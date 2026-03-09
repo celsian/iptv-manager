@@ -52,17 +52,6 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
     loadPlaylists();
   }, []);
 
-  useEffect(() => {
-    if (selectedPlaylist) {
-      if (selectedPlaylist === '__all__') {
-        loadAllPlaylistChannels();
-      } else {
-        loadPlaylistChannels();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlaylist]);
-
   // Get the IPTV playlist name for the selected playlist
   const getIptvPlaylist = (playlistName: string) => {
     const source = playlistSources.find(s => s.name === playlistName);
@@ -80,6 +69,9 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
       const sources = await api.playlists.sources();
       const sorted = (sources || []).sort((a, b) => a.name.localeCompare(b.name));
       setPlaylistSources(sorted);
+      if (selectedPlaylist) {
+        loadChannelsForPlaylist(selectedPlaylist);
+      }
     } catch (err) {
       console.error('Failed to load playlists:', err);
     } finally {
@@ -87,26 +79,36 @@ export function EnabledChannels({ initialPlaylist, onPlaylistChange }: EnabledCh
     }
   };
 
-  const selectPlaylist = async (playlist: string) => {
+  const selectPlaylist = (playlist: string) => {
     setSelectedPlaylist(playlist);
+    loadChannelsForPlaylist(playlist);
   };
 
-  const loadPlaylistChannels = async () => {
+  const loadChannelsForPlaylist = (playlist: string) => {
+    if (playlist === '__all__') {
+      loadAllPlaylistChannels();
+    } else {
+      loadPlaylistChannels(playlist);
+    }
+  };
+
+  const loadPlaylistChannels = async (playlist?: string) => {
+    const target = playlist || selectedPlaylist;
     setLoading(true);
     setError(null);
 
     try {
       // Check if playlist is dirty and update if needed
       setUpdatingPlaylist(true);
-      const updateResult = await api.playlists.updateIfDirty(selectedPlaylist);
+      const updateResult = await api.playlists.updateIfDirty(target);
       setUpdatingPlaylist(false);
 
       if (updateResult.updated) {
-        console.log(`Playlist ${selectedPlaylist} was updated from source`);
+        console.log(`Playlist ${target} was updated from source`);
       }
 
       // Get channels from the cached playlist
-      const data = await api.playlists.getChannels(selectedPlaylist);
+      const data = await api.playlists.getChannels(target);
       setChannels(data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load channels');
