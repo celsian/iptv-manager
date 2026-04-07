@@ -163,6 +163,43 @@ func TestParseFilterExpressionOperatorPrecedence(t *testing.T) {
 	}
 }
 
+func TestParseFilterExpressionQuotedTerm(t *testing.T) {
+	node, err := ParseFilterExpression(`!"Michigan State"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !MatchFilter(node, "NCAA Basketball Finals") {
+		t.Error("should match when 'Michigan State' is absent")
+	}
+	if MatchFilter(node, "Michigan State Basketball") {
+		t.Error("should not match when 'Michigan State' is present")
+	}
+	// Should still match plain "Michigan" (only the phrase is excluded)
+	if !MatchFilter(node, "Michigan Wolverines Basketball") {
+		t.Error("should match 'Michigan' alone since only the phrase 'Michigan State' is excluded")
+	}
+}
+
+func TestParseFilterExpressionQuotedWithOperators(t *testing.T) {
+	node, err := ParseFilterExpression(`NCAA AND !"Michigan State"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !MatchFilter(node, "NCAA Basketball Finals") {
+		t.Error("should match NCAA without Michigan State")
+	}
+	if MatchFilter(node, "NCAA Michigan State Game") {
+		t.Error("should not match when Michigan State is present")
+	}
+}
+
+func TestParseFilterExpressionUnclosedQuote(t *testing.T) {
+	_, err := ParseFilterExpression(`"Michigan State`)
+	if err == nil {
+		t.Error("should return error for unclosed quote")
+	}
+}
+
 func TestParseFilterExpressionInvalid(t *testing.T) {
 	_, err := ParseFilterExpression("(NCAA AND")
 	if err == nil {
