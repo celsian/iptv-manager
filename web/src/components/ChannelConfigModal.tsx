@@ -32,17 +32,17 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (channelNumber) {
-      const num = parseInt(channelNumber, 10);
+  const updateChannelNumber = (value: string) => {
+    setChannelNumber(value);
+    if (value) {
+      const num = parseInt(value, 10);
       loadNearbyChannels(num);
       checkConflict(num);
     } else {
       setNearbyChannels([]);
       setConflictWarning(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelNumber]);
+  };
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -55,7 +55,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
       if (existingChannelData) {
         // Channel already exists in local store
         setExistingChannel(true);
-        setChannelNumber(existingChannelData.channelNumber?.toString() || '');
+        updateChannelNumber(existingChannelData.channelNumber?.toString() || '');
         // Only populate if there's a custom name different from original
         setChannelName(existingChannelData.customName && existingChannelData.customName !== channel.title 
           ? existingChannelData.customName 
@@ -65,7 +65,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
       } else {
         // New channel - use playlist name as group title
         setExistingChannel(false);
-        setChannelNumber(nextNumberData.nextChannelNumber.toString());
+        updateChannelNumber(nextNumberData.nextChannelNumber.toString());
         setChannelName(''); // Empty, use placeholder
         setGroupTitle(playlist);
       }
@@ -207,7 +207,7 @@ export function ChannelConfigModal({ channel, playlist, onClose }: ChannelConfig
                 <input
                   type="text"
                   value={channelNumber}
-                  onChange={e => setChannelNumber(e.target.value)}
+                  onChange={e => updateChannelNumber(e.target.value)}
                   placeholder="Enter channel number"
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
