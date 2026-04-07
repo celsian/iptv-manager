@@ -133,6 +133,22 @@ func tokenize(expr string) ([]token, error) {
 			continue
 		}
 
+		// Quoted string: "multi word term"
+		if ch == '"' {
+			i++
+			start := i
+			for i < len(runes) && runes[i] != '"' {
+				i++
+			}
+			if i >= len(runes) {
+				return nil, fmt.Errorf("unclosed quote")
+			}
+			word := strings.ToLower(string(runes[start:i]))
+			tokens = append(tokens, token{typ: tokTerm, value: word})
+			i++ // skip closing quote
+			continue
+		}
+
 		// Read a word
 		start := i
 		for i < len(runes) && !unicode.IsSpace(runes[i]) && runes[i] != '(' && runes[i] != ')' && runes[i] != '!' {
