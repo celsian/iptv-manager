@@ -173,6 +173,9 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 
 	// Update job status
 	if len(result.Errors) > 0 {
+		for _, errMsg := range result.Errors {
+			log.Printf("AutoSearch: Job %s error: %s", job.Name, errMsg)
+		}
 		result.Message = fmt.Sprintf("Completed with %d errors", len(result.Errors))
 		e.store.UpdateJobStatus(job.ID, "warning", result.Message)
 	} else {
