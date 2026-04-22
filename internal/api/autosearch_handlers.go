@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/celsian/iptv-manager/internal/autosearch"
 	"github.com/robfig/cron/v3"
@@ -117,12 +118,15 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 
 	// Remove all channels managed by this job (both provider and local)
 	toggled := false
-	for _, channelID := range job.ManagedChannelIDs {
+	for i, channelID := range job.ManagedChannelIDs {
 		if iptvPlaylist != "" {
 			if err := s.iptvProvider.Toggle(iptvPlaylist, channelID, false); err != nil {
 				log.Printf("AutoSearch: Warning - failed to disable channel %s on provider during job deletion: %v", channelID, err)
 			} else {
 				toggled = true
+			}
+			if i < len(job.ManagedChannelIDs)-1 {
+				time.Sleep(500 * time.Millisecond)
 			}
 		}
 		s.channelStore.DeleteChannel(channelID)

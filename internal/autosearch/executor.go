@@ -41,7 +41,7 @@ func NewExecutor(store *Store, channelStore *channels.Store, iptvProvider iptv.P
 		playlistManager: playlistManager,
 		embyClient:      embyClient,
 		discordWebhook:  discordWebhook,
-		providerDelay:   1 * time.Second,
+		providerDelay:   500 * time.Millisecond,
 	}
 }
 
@@ -109,7 +109,7 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 	}
 
 	// Remove channels that no longer match
-	for _, id := range channelsToRemove {
+	for i, id := range channelsToRemove {
 		normalizedID := normalizeChannelID(id)
 		if err := e.disableChannel(normalizedID, iptvPlaylist); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("Failed to disable channel %s: %v", id, err))
@@ -117,13 +117,19 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 			result.ChannelsRemoved++
 			log.Printf("AutoSearch: Job %s removed channel %s", job.Name, id)
 		}
+		if i < len(channelsToRemove)-1 && e.providerDelay > 0 {
+			time.Sleep(e.providerDelay)
+		}
 	}
 
 	// Enable channels on IPTV provider that aren't already enabled
-	for _, ch := range channelsToAdd {
+	for i, ch := range channelsToAdd {
 		if !ch.Enabled {
 			if err := e.iptvProvider.Toggle(iptvPlaylist, ch.ID, true); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("Failed to enable channel %s on IPTV: %v", ch.ID, err))
+			}
+			if i < len(channelsToAdd)-1 && e.providerDelay > 0 {
+				time.Sleep(e.providerDelay)
 			}
 		}
 	}

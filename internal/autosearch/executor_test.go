@@ -370,6 +370,92 @@ func TestExecuteJobRelocatesConflictingChannels(t *testing.T) {
 	}
 }
 
+func TestExecuteJobReRunContiguousWithRemovals(t *testing.T) {
+	// Reproduces the MLB scenario: previous run left 7 channels at scattered numbers,
+	// new run finds only 5 channels, result should be contiguous from StartingChannel.
+	tmpDir := t.TempDir()
+	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
+	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
+	provider := newMockIPTVProvider()
+
+	// Non-managed channels occupying nearby numbers
+	channelStore.SetChannel(&channels.Channel{
+		IPTVId: "mlb_network", ChannelNumber: 920, Enabled: true, Playlist: "NO_EPG",
+	})
+	channelStore.SetChannel(&channels.Channel{
+		IPTVId: "mlb_padres", ChannelNumber: 921, Enabled: true, Playlist: "NO_EPG",
+	})
+
+	// Previous run's managed channels at scattered numbers (simulating old skip behavior)
+	prevManaged := []string{"ch10", "ch11", "ch12", "ch13", "ch14", "ch15", "ch16"}
+	for i, id := range prevManaged {
+		channelStore.SetChannel(&channels.Channel{
+			IPTVId: id, Name: fmt.Sprintf("Old Channel %d", i),
+			ChannelNumber: 930 + i, Enabled: true, Playlist: "Sports",
+		})
+	}
+
+	// New search returns only 5 of the 7 (ch11 and ch15 no longer match)
+	provider.searchResults["Sports:MLB"] = []iptv.Channel{
+		{ID: "10", Title: "MLB Game A", Enabled: true},
+		{ID: "12", Title: "MLB Game B", Enabled: true},
+		{ID: "13", Title: "MLB Game C", Enabled: true},
+		{ID: "14", Title: "MLB Game D", Enabled: true},
+		{ID: "16", Title: "MLB Game E", Enabled: true},
+	}
+
+	executor := newTestExecutor(store, channelStore, provider)
+
+	job := &Job{
+		Name:              "MLB",
+		Playlist:          "Sports",
+		SearchTerm:        "MLB",
+		StartingChannel:   930,
+		UseProviderName:   true,
+		Enabled:           true,
+		ManagedChannelIDs: prevManaged,
+	}
+	store.CreateJob(job)
+
+	result := executor.ExecuteJob(job.ID)
+	if !result.Success {
+		t.Fatalf("ExecuteJob failed: %s (errors: %v)", result.Message, result.Errors)
+	}
+
+	if result.ChannelsRemoved != 2 {
+		t.Errorf("ChannelsRemoved = %d, want 2", result.ChannelsRemoved)
+	}
+
+	// All 5 channels must be contiguous starting at 930
+	expectedIDs := []string{"ch10", "ch12", "ch13", "ch14", "ch16"}
+	for i, id := range expectedIDs {
+		ch, ok := channelStore.GetChannel(id)
+		if !ok {
+			t.Fatalf("channel %s should exist", id)
+		}
+		want := 930 + i
+		if ch.ChannelNumber != want {
+			t.Errorf("channel %s: ChannelNumber = %d, want %d", id, ch.ChannelNumber, want)
+		}
+	}
+
+	// Non-managed channels should NOT have been moved (they're outside the range)
+	mlbNet, _ := channelStore.GetChannel("mlb_network")
+	if mlbNet.ChannelNumber != 920 {
+		t.Errorf("mlb_network should stay at 920, got %d", mlbNet.ChannelNumber)
+	}
+
+	// Removed channels should be deleted
+	_, exists := channelStore.GetChannel("ch11")
+	if exists {
+		t.Error("ch11 should be deleted (no longer matches)")
+	}
+	_, exists = channelStore.GetChannel("ch15")
+	if exists {
+		t.Error("ch15 should be deleted (no longer matches)")
+	}
+}
+
 func TestExecuteJobUpdatesExistingChannels(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
