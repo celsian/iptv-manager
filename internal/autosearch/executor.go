@@ -141,7 +141,9 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 		time.Sleep(e.providerDelay)
 	}
 
-	// Refresh the playlist to get updated M3U reflecting all enable/disable changes
+	// Refresh the playlist to get updated M3U reflecting all enable/disable changes.
+	// The refresh may disable channels that aren't in the M3U yet (provider lag),
+	// so we re-enable any managed channels that got incorrectly disabled.
 	if e.playlistManager != nil {
 		if err := e.playlistManager.UpdatePlaylist(job.Playlist); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("Failed to refresh playlist: %v", err))
@@ -149,11 +151,22 @@ func (e *Executor) executeJobInternal(job *Job) ExecutionResult {
 		} else {
 			log.Printf("AutoSearch: Job %s refreshed playlist %s", job.Name, job.Playlist)
 
-			// Sync stream URLs from the fresh M3U into channels.json
+			// Re-enable managed channels that the refresh may have disabled
+			// and sync stream URLs from the fresh M3U
 			for _, id := range allManagedIDs {
 				if ch, ok := e.channelStore.GetChannel(id); ok {
+					changed := false
+					if !ch.Enabled {
+						ch.Enabled = true
+						ch.DisabledAt = ""
+						changed = true
+						log.Printf("AutoSearch: Job %s re-enabled channel %s after playlist refresh", job.Name, id)
+					}
 					if url, err := e.playlistManager.GetChannelURL(id, job.Playlist); err == nil && url != "" {
 						ch.URL = url
+						changed = true
+					}
+					if changed {
 						e.channelStore.SetChannel(ch)
 					}
 				}
