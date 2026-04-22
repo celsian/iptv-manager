@@ -126,7 +126,7 @@ func (s *Server) handleDeleteAutoSearchJob(w http.ResponseWriter, r *http.Reques
 				toggled = true
 			}
 			if i < len(job.ManagedChannelIDs)-1 {
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(1 * time.Second)
 			}
 		}
 		s.channelStore.DeleteChannel(channelID)
