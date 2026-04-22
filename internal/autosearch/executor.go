@@ -219,8 +219,19 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 		return strings.ToLower(matchedChannels[i].Title) < strings.ToLower(matchedChannels[j].Title)
 	})
 
-	// Get all occupied channel numbers (excluding channels managed by this job)
-	occupiedNumbers := e.getOccupiedChannelNumbers(job.ManagedChannelIDs)
+	// Build set of IDs managed by this job (previous + current matched)
+	managedSet := make(map[string]bool)
+	for _, id := range job.ManagedChannelIDs {
+		managedSet[id] = true
+	}
+	for _, ch := range matchedChannels {
+		managedSet[normalizeChannelID(ch.ID)] = true
+	}
+
+	// Relocate any non-managed channels occupying the contiguous range we need
+	rangeStart := job.StartingChannel
+	rangeEnd := job.StartingChannel + len(matchedChannels) - 1
+	e.relocateConflictingChannels(managedSet, rangeStart, rangeEnd)
 
 	var managedIDs []string
 	channelNum := job.StartingChannel
@@ -228,11 +239,6 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 
 	for _, ch := range matchedChannels {
 		normalizedID := normalizeChannelID(ch.ID)
-
-		// Find next available channel number
-		for occupiedNumbers[channelNum] {
-			channelNum++
-		}
 
 		// Generate channel name
 		channelName := e.generateChannelName(job, channelIndex, ch.Title)
@@ -273,12 +279,53 @@ func (e *Executor) assignChannelNumbers(job *Job, matchedChannels []iptv.Channel
 		}
 
 		managedIDs = append(managedIDs, normalizedID)
-		occupiedNumbers[channelNum] = true
 		channelNum++
 		channelIndex++
 	}
 
 	return managedIDs
+}
+
+// relocateConflictingChannels moves non-managed channels out of the reserved range
+// by assigning them the next available number after the range.
+func (e *Executor) relocateConflictingChannels(managedSet map[string]bool, rangeStart, rangeEnd int) {
+	allChannels := e.channelStore.GetAllChannels()
+
+	// Collect all used channel numbers
+	usedNumbers := make(map[int]bool)
+	for _, ch := range allChannels {
+		if ch.Enabled && ch.ChannelNumber > 0 {
+			usedNumbers[ch.ChannelNumber] = true
+		}
+	}
+
+	// Reserve the range for managed channels
+	for num := rangeStart; num <= rangeEnd; num++ {
+		usedNumbers[num] = true
+	}
+
+	nextAvailable := rangeEnd + 1
+
+	for _, ch := range allChannels {
+		if !ch.Enabled || ch.ChannelNumber < rangeStart || ch.ChannelNumber > rangeEnd {
+			continue
+		}
+		if managedSet[ch.IPTVId] {
+			continue
+		}
+
+		// Find next available number after the range
+		for usedNumbers[nextAvailable] {
+			nextAvailable++
+		}
+
+		log.Printf("AutoSearch: Relocating channel %s (%s) from %d to %d",
+			ch.IPTVId, ch.CustomName, ch.ChannelNumber, nextAvailable)
+		ch.ChannelNumber = nextAvailable
+		e.channelStore.SetChannel(ch)
+		usedNumbers[nextAvailable] = true
+		nextAvailable++
+	}
 }
 
 func (e *Executor) getOccupiedChannelNumbers(excludeIDs []string) map[int]bool {
