@@ -41,7 +41,7 @@ func NewExecutor(store *Store, channelStore *channels.Store, iptvProvider iptv.P
 		playlistManager: playlistManager,
 		embyClient:      embyClient,
 		discordWebhook:  discordWebhook,
-		providerDelay:   500 * time.Millisecond,
+		providerDelay:   1 * time.Second,
 	}
 }
 
