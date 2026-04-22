@@ -317,13 +317,13 @@ func TestExecuteJobRemovesChannels(t *testing.T) {
 	}
 }
 
-func TestExecuteJobSkipsOccupiedNumbers(t *testing.T) {
+func TestExecuteJobRelocatesConflictingChannels(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, _ := NewStore(filepath.Join(tmpDir, "autosearch.json"))
 	channelStore, _ := channels.NewStore(filepath.Join(tmpDir, "channels.json"))
 	provider := newMockIPTVProvider()
 
-	// Occupy channel 1001
+	// Occupy channel 1001 with a non-managed channel
 	channelStore.SetChannel(&channels.Channel{
 		IPTVId:        "existing",
 		ChannelNumber: 1001,
@@ -352,15 +352,21 @@ func TestExecuteJobSkipsOccupiedNumbers(t *testing.T) {
 		t.Fatalf("ExecuteJob failed: %s", result.Message)
 	}
 
-	// Check channels skipped 1001
+	// Managed channels get contiguous numbers starting at 1000
 	ch1, _ := channelStore.GetChannel("ch1")
 	ch2, _ := channelStore.GetChannel("ch2")
 
 	if ch1.ChannelNumber != 1000 {
 		t.Errorf("ch1 ChannelNumber = %d, want 1000", ch1.ChannelNumber)
 	}
-	if ch2.ChannelNumber != 1002 { // Should skip 1001
-		t.Errorf("ch2 ChannelNumber = %d, want 1002 (should skip 1001)", ch2.ChannelNumber)
+	if ch2.ChannelNumber != 1001 {
+		t.Errorf("ch2 ChannelNumber = %d, want 1001", ch2.ChannelNumber)
+	}
+
+	// Conflicting channel should be relocated after the range
+	existing, _ := channelStore.GetChannel("existing")
+	if existing.ChannelNumber != 1002 {
+		t.Errorf("existing ChannelNumber = %d, want 1002 (relocated after range)", existing.ChannelNumber)
 	}
 }
 
